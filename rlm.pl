@@ -3,8 +3,8 @@ use warnings;
 use strict;
 use vars '$separator', '$userside','$enginename';
 use Benchmark;
-$enginename = "RLMv0.95";
-$separator = "turkeyburp";
+$enginename = "RLMv0.96";
+$separator = "turkeyburp"; # I have no idea why this is here :)
 print "Welcome to the RLM Engine. Would you like to play a game of chess? (yep/nope): ";
 my $input = <>;
 my ($fen, $correct);
