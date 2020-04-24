@@ -1,86 +1,99 @@
 #!/usr/local/bin/perl
+## I'm adding comments to the original code to try to explain as much as possible
+## what is happening.  These new comments will all start with two # signs to distinguish
+## them from pre-existing comments. I am going to refrain from changing the code on this
+## branch for as long as I possibly can :)
+##
+## The top line of the file, as I recall, makes it executable in some shell contexts
+## by telling the shell where to find the perl interpreter executable.  I don't think
+## it is necessary if you run it with the perl command. 
+## 
+## "use" statements in Perl incorporate code from other Perl modules (at least roughly)
 use warnings;
-use strict;
-use vars '$separator', '$userside','$enginename';
-use Benchmark;
+use strict; ## makes it so that all local variables have to be declared with "my"
+use vars '$separator', '$userside','$enginename'; ## declares these three variable names to be global within this package
+use Benchmark; ## the Benchmark module is used for timing, it's used below to report how long moves took
 $enginename = "RLMv0.96"; # making a change here for testing branch commit
-$separator = "turkeyblurp"; # I have no idea why this is here :)
+$separator = "turkeyblurp"; ## I think we use this as a unique separator string below (I'll verify and come back later)
 print "Welcome to the RLM Engine. Would you like to play a game of chess? (yep/nope): ";
-my $input = <>;
-my ($fen, $correct);
-if($input =~ /y/i)
+my $input = <>; ## This gets keyboard input from the terminal and puts it in the variable $input
+my ($fen, $correct); ## This declares two variables without assigning anything to them
+if($input =~ /y/i) ## In Perl, this means compare the string in $input with the pattern "y" (case insensitive), and if there is a match, return true
 {       print "\nWould you like to play from the normal starting position? (yep/nope): ";
         $input = <>;
-        if($input =~ /y/i)
-        {       $fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        }
-        else
+        if($input =~ /y/i) ## True if user typed something with a "y"
+        {       $fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";  ## This is the FEN (Forsyth-Edwards Notation) for the normal starting position
+        } ## Go read about FEN somewhere, it's pretty accessible, it's almost like reading the board left to right and top to bottom :)
+        else ## if the user didn't type something with a "y"
         {       print "\nOkay. Please enter the FEN for the position from which you would like to play:\n";
-                chomp($fen = <>);
-                if(&validfen($fen))
-                {       print &showboard($fen)."\nIs this correct? (yep/nope): ";
-                        chomp($correct = <>);
+                chomp($fen = <>); ## chomp removes the trailing newline character from the user's input
+                if(&validfen($fen)) ## this is supposed to check if the position the user entered is actually a valid chess position (but the &validfen currently just always returns true because this is actually kind of hard to check)
+                {       print &showboard($fen)."\nIs this correct? (yep/nope): ";  ## show the user the position they entered and ask if it is correct
+                        chomp($correct = <>);  ## get the user's response 
                 }
-                while(($correct =~ /n/i) or (!&validfen($fen)))
+                while(($correct =~ /n/i) or (!&validfen($fen))) ## we can't proceed until there is a valid board position and the user has OK'd it
                 {       if(!&validfen($fen))
                         {       print "That's not a valid FEN. Try again or type \"start\" to begin at the starting position.\n";
                         }
                         else
                         {       print "Okay. Try again with another FEN or type \"start\" to begin at the starting position.\n";
                         }
-                        chomp($fen = <>);
-                        if($fen =~ /s/i)
+                        chomp($fen = <>); ## get another board position
+                        if($fen =~ /s/i)  ## check if the user typed something with an "s" (present in "start" but not in any valid FEN)
                         {       $fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
                         }
                         if(&validfen($fen))
-                        {       print &showboard($fen)."\nIs this correct? (yep/nope): ";
-                                chomp($correct = <>);
+                        {       print &showboard($fen)."\nIs this correct? (yep/nope): "; ## print board position, ask if correct
+                                chomp($correct = <>); ## get user's answer
                         }
                 }
         }
 }
-else
+else  ## if user didn't say yes to playing chess
 {       print "In that case, I suggest twiddling your thumbs until you ARE ready to play chess. Good day to you!";
-        exit;
+        exit; ## exit program
 }
 print "\nWould you like to play the white side or the black side?\n";
-$input = <>;
-if($input =~ /w/i)
-{       $userside = "w";
+$input = <>; ## get user's response
+if($input =~ /w/i) ## if user's response has a "w", they chose white
+{       $userside = "w";  ## this is the variable that keeps track of whether the user is white, black, or not playing
         print "\nWonderful, I enjoy playing black!\n"
 }
-elsif($input =~ /b/i)
+elsif($input =~ /b/i) ## if user's repsonse has a "b" (and no "w") they chose black
 {       $userside = "b";
         print "\nWicked cool! I simply adore playing white!\n";
 }
-else
+else  ## if user's response lacks a "w" or a "b", then the RLM will play both sides of the board
 {       print "Aw, to heck with you, I'll play myself!!\n";
-        $userside = "none";
+        $userside = "none"; ## this is how we represent that the user isn't playing either side
 }
 print "Should I record the moves of this game in a PGN file? (yep/nope):";
-$input = <>;
-my $pgnflag = 0;
-my ($filename,$username,$site,$white,$black,$date,$tmpfilename);
-my $setupflag = 0;
-if ($input =~ /y/i)
+$input = <>; ## get user resposne to whether there should be a PGN record of the game
+my $pgnflag = 0; ## initialize this to false, we'll change it to true if the user has said yes
+my ($filename,$username,$site,$white,$black,$date,$tmpfilename); ## declare several variables without setting them
+my $setupflag = 0; ## initalize to false.  This variable is to track whether the starting position is not the normal starting position
+if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if so, we need to set up the PGN file
 {       print "What file would you like to record to?\nFilename: ";
-        chomp($filename = <>);
-        if ($filename !~ /\.\w+/)
-        {       $filename = $filename . ".pgn";
+        chomp($filename = <>); ## gather user response for name of pgn file
+        if ($filename !~ /\.\w+/) ## check if the filename has an extension (a period followed by one or more letters)
+        {       $filename = $filename . ".pgn"; ## if not, add a .pgn extension
         }
-        $tmpfilename = "$filename.tmp";
-        open TMPPGNHANDLE, ">$tmpfilename";
-        open REALPGNHANDLE, ">>$filename";
-        unless ($userside eq "none")
+        $tmpfilename = "$filename.tmp";  ## Make a temporary pgn file with the same name but also .tmp on the end (I don't remember why we did this, maybe it will be clearer later)
+        open TMPPGNHANDLE, ">$tmpfilename"; ## This creates the temp pgn file, and opens it for writing. Printing to TMPPGNHANDLE will write into this file
+        open REALPGNHANDLE, ">>$filename"; ## Creates the real pgn file and opens it for appending (not sure why). Printing to REALPGNHANDLE will write into this file
+        ## TMPPGNHANDLE and REALPGNHANDLE are made global variables here, a quirky (and probably bad practice) thing allowed by Perl. I found this out looking at documentation for "open"
+        ## The next section of code sets up the top of the PGN file (location, date, players, starting position if non-standard)
+        unless ($userside eq "none") ## This is a funny perl conditional, it's the same as if ($userside ne "none"); {eq is string equals, ne is string not equals}
         {       print "What do they call you?\nName: ";
-                chomp($username = <>);
+                chomp($username = <>); ## get user's name, store in $username
         }
         print "Where can I find you?\nCurrent Location: ";
-        chomp($site = <>);
-        print TMPPGNHANDLE "\n\n[Event \"RLM Game\"]\n[Site \"$site\"]\n";
-        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-        $date = join(".",$year+1900,$mon+1,$mday);
-        print TMPPGNHANDLE "[Date \"$date\"]\n[Round \"-\"]\n";
+        chomp($site = <>); ## location of user
+        print TMPPGNHANDLE "\n\n[Event \"RLM Game\"]\n[Site \"$site\"]\n"; ## Write the first few lines to the temp PGN file
+        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time); ## get the current time from the computer
+        $date = join(".",$year+1900,$mon+1,$mday); ## Assemble the date in the format YYYY.MM.DD
+        print TMPPGNHANDLE "[Date \"$date\"]\n[Round \"-\"]\n"; ## Write the date to the temp PGN file
+        ## The next section sorts out the player names
         if ($userside eq "w")
         {       $white = $username;
                 $black = $enginename;
@@ -93,42 +106,52 @@ if ($input =~ /y/i)
         {       $white = $enginename;
                 $black = $enginename;
         }
-        print TMPPGNHANDLE "[White \"$white\"]\n[Black \"$black\"]\n";
-        if ($fen ne "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-        {       print TMPPGNHANDLE "[SetUp \"1\"]\n[FEN \"$fen\"]\n";
-                $setupflag = 1;
+        print TMPPGNHANDLE "[White \"$white\"]\n[Black \"$black\"]\n"; ## print player names to temp PGN
+        ## $fen has the starting position, the next line checks if it matches the standard starting position
+        if ($fen ne "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") 
+        {       print TMPPGNHANDLE "[SetUp \"1\"]\n[FEN \"$fen\"]\n"; ## If not standard, write the starting FEN to the temp PGN file
+                $setupflag = 1; ## This flag being 1 (true) means that the game started from a non-standard position
         }
-        print TMPPGNHANDLE "[Result \"*\"]\n";
-        $pgnflag = 1;
-}
-
-        
-
-my $gameover = 0;
+        print TMPPGNHANDLE "[Result \"*\"]\n"; ## This is what you write as the result for an unfinished game
+        $pgnflag = 1; ## This flag being 1 (true) means that the game is being recorded to a PGN file
+} ## end of if for PGN file set up.  We don't need an else because there's nothing to do if the "if" wasn't true
+       
+## Tell the user how to enter their moves, including some examples
 print "\nWhen entering moves during the game, please indicate the piece to move, its origin square, and destination square. You may indicate a capture (with an \"x\") or check (with a \"+\") if you'd like, for example the following are all valid moves:\nBc1f4, e2e4, pc2c4, qa1xh8+, g7g8=q\n\n";
-print &showboard($fen);
-my $usermove;
-my $move;
+print &showboard($fen); ## This shows the starting board position (so that the user can look at it when deciding on their move)
+my $usermove; ## declare variable to hold the user's chosen move
+my $move; ## Not sure why this is here, may have to do with making sure the scope of the $move variable is right (feel free to ask what scope is!).  Might try commenting it out later and see if anything goes wrong.
+## The next line processes the initial position $fen by calling the subroutine named &processfen, and puts the results in several variables. 
+## Feel free to jump down to the section a couple hundred lines below which starts says "sub processfen", where this subroutine is defined
 my ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@restofstuff) = &processfen($fen);
-if ($pgnflag and $setupflag and $side2move eq "b")
+## If Black is moving first and we're recording a PGN, we need to print the move number followed by 3 dots (as the placeholder for white's missing move). That just comes from the standard for PGN files. 
+if ($pgnflag and $setupflag and $side2move eq "b")  
 {       print TMPPGNHANDLE "$totalmoves. ... ";
 }
-
-while(!$gameover)
-{
-my $movestarttime = new Benchmark;
+##
+## This marks the end of the set-up portion of the code, and the beginning of the game play
+##
+my $gameover = 0;  ## a flag to indicate whether the game is over, intialized to false
+while(!$gameover)  ## loop until the game is marked over by changing $gameover to true
+{ ## beginning of game while loop. Each pass through the loop corresponds to one move by one of the players
+## From here to the end of the while loop should probably be indented, but we may have decided it pushed the text too far over to the right...
+my $movestarttime = new Benchmark;  ## This is used to time how long moves take
 #my $board = showboard($fen);
 #print "Old Position:\n\n$board\n\n";
 #my ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@restofstuff) = &processfen($fen);
-if ($movessince >= 100)
+
+## A chess game is automatically drawn if 50 full moves (50 moves by each side) have elapsed without a 
+## pawn move or a capture. So, every move, we need to check whether this has happened, and the game needs 
+## to end immediately if so. 
+if ($movessince >= 100) ## $movessince counts half-moves since the last pawn move or capture, so it needs to get to 100 to trigger the automatic draw 
 {       print "The game is drawn because both sides have just been running around like idiots and more than 50 moves have elapsed without a pawn move or capture, for crying out loud!\n\n";
-        if ($pgnflag)
-        {       &writeresult("draw",$tmpfilename,$filename);
+        if ($pgnflag) ## this is true if the user requested a PGN output
+        {       &writeresult("draw",$tmpfilename,$filename); ## The &writeresult subroutine writes the given result to the give PGN files
         }
-        exit;
+        exit;  ## this ends the RLM program
 }
 my $checkflag = &incheck($okcastle,$enpassant,@restofstuff);
-## Call the subroutine which makes the moves list!!
+# Call the subroutine which makes the moves list!!
 my @curmoveslist = &makemoveslist($checkflag,$okcastle,$enpassant,@restofstuff);
 #print "Current moves list is: @curmoveslist\n\n";
 my @cmlalg = &cart2alg(@curmoveslist);
@@ -347,53 +370,98 @@ $board = join("\n",@rows,"    A  B  C  D  E  F  G  H\n\n");
 return $board;
 }
 #===============================================================================
+## The &processfen subroutine takes in a game state, represented by a FEN string
+## and processes it into its parts, returning where it is permissable to castle (in $okcastle),
+## whether there is a possible en passant capture square ($enpassant), how many half moves
+## since the the last pawn move or capture ($movessince), the total number of whole moves
+## in the game ($totalmoves), whose turn it is to move ($side2move), the positions of 
+## all the pieces of the player whose turn it is to move (@side2move), an arbitrary and unique
+## separator ("turkeyburp") (so we can find where to break up the list later), and the 
+## positions of all the pieces of the other player (@adversary).
+##
+## As an overview of how it does this is, bring in the FEN string, split it into pieces
+## where there are spaces in the FEN, this yields 6 pieces, the first of which is the board
+## position and the rest of which represent other aspects of the game state (whose turn, allowed
+## castling, e.p., moves since capture or pawn move, and total game moves).  Only the board position
+## requires much further processing.  We want to turn it into a list of positions of the white
+## and black pieces. This subroutine takes a few steps to get there.  We decided that we wanted 
+## to represent positions with a cartesian coordinate, so 3rd row (from white's side), 5th column, which is 
+## square e3 in algebraic chess notation, would be 53 in our cartesian notation (column # then row #).
+## I think we did it this way because we figured numbers would be easier to work with than translating 
+## back and forth to letters for the column.  
+## The raw board position starts off in $poslist as something like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+## Then we strip out the forward slashes so it becomes "rnbqkbnrpppppppp8888PPPPPPPPRNBQKBNR"
+## Next, we replace anywhere with a digit by that many copies of the number "0", so this one would become "rnbqkbnrpppppppp00000000000000000000000000000000PPPPPPPPRNBQKBNR"
+## Any valid FEN board position run through this process will now be exactly 64 characters long, one for each board square in order from a8-h8,then a7-h7, etc down to h1 (left to right, then down looking at a board as normally printed)
+## Empty squares will have 0, and non-empty squares will have a letter representing what piece is on that square, lowercase for black, uppercase for white.
+## That 64 character string is then split into a list of 64 individual characters (@possplit)
+## Next, separately, a list of the corresponding cartesian coordinates for each square is constructed (as @cart), 
+## by looping over row numbers from 8 to 1 (outer loop) and column numbers from 1 to 8 (inner loop).
+## Finally, we loop over each element of the list of 64 individual characters in @possplit and examine each one.
+## If the character is a "0", then we don't do anything with it. If the character is a lowercase letter (a black piece),
+## then we grab its corresponding cartesian coordinate and make a combined string which is the letter followed by the column
+## number and row number.  For example, in the standard starting position, the first character in the @possplit list will be
+## a lowercase 'r'.  The corresponding first element in the list @cart is '18', meaning first column and 8th row. So, the combined
+## string is 'r18', meaning a black rook on a8. That, string, 'r18' is then added to the list of black piece positions (@blackpos)
+## Lastly, we actually need to know the set of piece positions for the person whose turn it is, and so far we just know
+## the white piece positions and the black piece positions.  So, depending on the $side2move, we either put the
+## white piece position list in @adversary or in @side2move, and the black piece position list in the other one. 
+## When we spit out the large list of outputs, Perl does not not keep them grouped the way we put them in, Perl just
+## makes one big flat list of them. Because of this, we insert the $separator ('turkeyburp') into the list between the
+## @side2move position list and the @adversary position list. That way, when we are going through the big output list, we
+## know that everything after 'turkeyburp' is the @adversary position list.  The first 5 listed outputs are all single elements
+## so we know that we can just take those individually.  Then, we know that everything after those first 5 until we hit 'turkeyburp'
+## is the @side2move position list. Without a unique separator, it would be more work to figure out where @side2move was supposed 
+## to end, and @adversary was supposed to begin. 
 sub processfen
-{
+{ ## everything inside these braces is part of the &processfen subroutine
+## The next few lines are old comments and don't do anything.  They probably indicate that this code was once the beginning of play. 
 #use warnings;
 # print "Welcome to Mike and Dan's RLM engine. Please enter the complete FEN of the position from which you would like to play. Don't forget to put spaces between the six data sets. Use a dash for an empty castling or en passant entry. If you would like to play from the starting position, just type \"start\". Enjoy!\n\n\n";
 # $fen = <>;
 # chomp $fen;
 # $fen =~ s|\s+| |g;
-my ($fen) = @_;#"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+## @_ is the list of inputs given when &processfen was called.  This next line gets the first input and assigns it to $fen. (If there were any other inputs they would be ignored)
+my ($fen) = @_;#"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; ## this comment is an example FEN for reference
 # split up the FEN into the various data sets
-my @fenar = (split " ", $fen);
-my ($poslist, $side2move, $okcastle, $enpassant, $movessince, $totalmoves) = @fenar;
+my @fenar = (split " ", $fen); ## split the string in $fen into a list of strings, wherever spaces are found
+my ($poslist, $side2move, $okcastle, $enpassant, $movessince, $totalmoves) = @fenar; ## assign the 6 elements of the @fenar list  to 6 individual variables
 #print "$poslist\n$side2move\n$okcastle\n$enpassant\n$movessince\n$totalmoves\n";
-$poslist =~ s|/||g;
+$poslist =~ s|/||g; ## strip out forward slashes
 #print "$poslist\n";
-$poslist =~ s|(\d)|0 x $1|eg;
+$poslist =~ s|(\d)|0 x $1|eg; ## replace digits with the corresponding number of "0" characters
 #print "$poslist\n";
-my @possplit = (split "", $poslist);
+my @possplit = (split "", $poslist); ## split the $poslist string into a list of individual characters
 #print "@possplit \n\n";
-my @cart = ();
+my @cart = (); ## initialize an empty list to hold cartesian square coordinates in the same order they appear in FEN's
 my ($row,$col,$pos);
-for($row = 8; $row > 0; $row--) {
-        for($col = 1; $col < 9; ++$col) {
-                $pos = $col.$row;
-                push @cart, $pos;
+for($row = 8; $row > 0; $row--) { ## loop over rows in the same order they appear in FEN's, counting down from 8
+        for($col = 1; $col < 9; ++$col) { ## loop over columns, counting up 1 to 8
+                $pos = $col.$row; ## combine column and row into single string
+                push @cart, $pos; ## add the string to the list @cart
         }
 }
 my (@whitepos,@blackpos) = ();
 my $posnum;
 for ($posnum=0; $posnum<64; $posnum++){
-        if ($possplit[$posnum] =~ /[A-Z]/){
-                push @whitepos, $possplit[$posnum].$cart[$posnum];
+        if ($possplit[$posnum] =~ /[A-Z]/){ ## if the $posnum'th entry in @possplit is a capital letter...
+                push @whitepos, $possplit[$posnum].$cart[$posnum]; ## ...combine that letter with corresponding entry in @cart and add it to the list of white piece positions
         }
-        elsif ($possplit[$posnum] =~ /[a-z]/){
-                push @blackpos, $possplit[$posnum].$cart[$posnum];
+        elsif ($possplit[$posnum] =~ /[a-z]/){ ## if the $posnum'th entry in @possplit is a lowercase letter...
+                push @blackpos, $possplit[$posnum].$cart[$posnum]; ## ...combine that letter with corresponding entry in @cart and add it to the list of black piece positions
         }
 }
 #print "@whitepos\n\n@blackpos";
 my (@side2move,@adversary);
-if ($side2move =~ /w/i) {
+if ($side2move =~ /w/i) { ## if $side2move has a "w", then the white pieces can move, and the black pieces belong to the adversary 
         @side2move  = @whitepos;
         @adversary = @blackpos;
 }
-else {
+else { ## otherwise, the black pieces can move, and the white pieces belong to the adversary
         @side2move = @blackpos;
         @adversary = @whitepos;
 }
-return ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@side2move,$separator,@adversary)
+return ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@side2move,$separator,@adversary) ## return the huge list of outputs
 } # end of &processfen
 #===============================================================================
 sub makenewfen
