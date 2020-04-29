@@ -194,11 +194,39 @@ if ($side2move eq $userside)
         @legalmoveslist_alg = &cart2alg(@legalmoveslist);
         foreach (@legalmoveslist_alg)
         {       push @grindermoves, &movegrinder($_);
-        }
+        } 
+        my $nonLegalMoveCount = 0;
         while(!&onlist($usermove, @grindermoves))
-        {       print "\nTut tut! I'm sorry, but that was not a legal move. If you've queened, don't forget to include \"=Q\", etc. Please try again.\n\nEnter move: ";
-                chomp ($usermove = <>);
-                $usermove = &movegrinder($usermove);
+        {       if ($nonLegalMoveCount==0)
+                {       # First time entering a non-legal move for this move
+                        print "\nTut tut! I'm sorry, but that was not a legal move. If you've queened, don't forget to include \"=Q\", etc. Please try again.\n\nEnter move: ";
+                        chomp ($usermove = <>);
+                        $usermove = &movegrinder($usermove);
+                        $nonLegalMoveCount++;
+                } 
+                elsif ($nonLegalMoveCount==1)
+                {       # user has now entered more than one non-legal move, let's give them some help!
+                        print "\nWell now, you're obviously having trouble.  Here is a suggestion of a random legal move you could make: ";
+                        my $rand = sprintf("%i",rand($#legalmoveslist_alg+1));
+                        my $suggestedMove = $legalmoveslist_alg[$rand];
+                        print "$suggestedMove";
+                        print "\nWhat's your move?\nEnter move: ";
+                        chomp ($usermove = <>);
+                        $usermove = &movegrinder($usermove);
+                        $nonLegalMoveCount++;
+                }
+                else
+                {       # user has now failed at least twice trying to enter a legal move, time to provide all possible moves, and they can choose!
+                        print "\nOK, you're clearly not getting this. Here are all the possible legal moves you could make:\n";
+                        foreach (@grindermoves)
+                        {       
+                                print "$_\n";
+                        }
+                        print "\nEnter move: ";
+                        chomp ($usermove = <>);
+                        $usermove = &movegrinder($usermove);
+                        $nonLegalMoveCount++;
+                }
         }
         $move = $usermove;
         &sillytalk;
