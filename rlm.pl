@@ -64,12 +64,12 @@ elsif($input =~ /b/i) ## if user's repsonse has a "b" (and no "w") they chose bl
         print "\nWicked cool! I simply adore playing white!\n";
 }
 else  ## if user's response lacks a "w" or a "b", then the RLM will play both sides of the board
-{       print "Aw, to heck with you, I'll play myself!!\n";
+{       print "Aw, to heck with you! I'll play myself!!\n";
         $userside = "none"; ## this is how we represent that the user isn't playing either side
 }
 print "Should I record the moves of this game in a PGN file? (yep/nope):";
-$input = <>; ## get user resposne to whether there should be a PGN record of the game
-my $pgnflag = 0; ## initialize this to false, we'll change it to true if the user has said yes
+$input = <>; ## get user response to whether there should be a PGN record of the game
+my $pgnflag = 0; ## initialize this to false. we'll change it to true if the user has said yes
 my ($filename,$username,$site,$white,$black,$date,$tmpfilename); ## declare several variables without setting them
 my $setupflag = 0; ## initalize to false.  This variable is to track whether the starting position is not the normal starting position
 if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if so, we need to set up the PGN file
@@ -78,12 +78,12 @@ if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if 
         if ($filename !~ /\.\w+/) ## check if the filename has an extension (a period followed by one or more letters)
         {       $filename = $filename . ".pgn"; ## if not, add a .pgn extension
         }
-        $tmpfilename = "$filename.tmp";  ## Make a temporary pgn file with the same name but also .tmp on the end (I don't remember why we did this, maybe it will be clearer later)
+        $tmpfilename = "$filename.tmp";  ## Make a temporary pgn file with the same name but also .tmp on the end. This is to maintain a distinction between a partially written file and a finalized one. If you are appending to a PGN record of games, you wouldn't want to corrupt the whole thing with a broken pgn.
         open TMPPGNHANDLE, ">$tmpfilename"; ## This creates the temp pgn file, and opens it for writing. Printing to TMPPGNHANDLE will write into this file
         open REALPGNHANDLE, ">>$filename"; ## Creates the real pgn file and opens it for appending (not sure why). Printing to REALPGNHANDLE will write into this file
         ## TMPPGNHANDLE and REALPGNHANDLE are made global variables here, a quirky (and probably bad practice) thing allowed by Perl. I found this out looking at documentation for "open"
         ## The next section of code sets up the top of the PGN file (location, date, players, starting position if non-standard)
-        unless ($userside eq "none") ## This is a funny perl conditional, it's the same as if ($userside ne "none"); {eq is string equals, ne is string not equals}
+        unless ($userside eq "none") ## This is a funny perl conditional, it's the same as if ($userside ne "none"); {eq is the "equals" operator for strings, ne is the "not equal" operator}
         {       print "What do they call you?\nName: ";
                 chomp($username = <>); ## get user's name, store in $username
         }
@@ -106,7 +106,7 @@ if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if 
         {       $white = $enginename;
                 $black = $enginename;
         }
-        print TMPPGNHANDLE "[White \"$white\"]\n[Black \"$black\"]\n"; ## print player names to temp PGN
+        print TMPPGNHANDLE "[White \"$white\"]\n[Black \"$black\"]\n"; ## write player names to temp PGN
         ## $fen has the starting position, the next line checks if it matches the standard starting position
         if ($fen ne "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") 
         {       print TMPPGNHANDLE "[SetUp \"1\"]\n[FEN \"$fen\"]\n"; ## If not standard, write the starting FEN to the temp PGN file
@@ -120,9 +120,9 @@ if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if 
 print "\nWhen entering moves during the game, please indicate the piece to move, its origin square, and destination square. You may indicate a capture (with an \"x\") or check (with a \"+\") if you'd like, for example the following are all valid moves:\nBc1f4, e2e4, pc2c4, qa1xh8+, g7g8=q\n\n";
 print &showboard($fen); ## This shows the starting board position (so that the user can look at it when deciding on their move)
 my $usermove; ## declare variable to hold the user's chosen move
-my $move; ## Not sure why this is here, may have to do with making sure the scope of the $move variable is right (feel free to ask what scope is!).  Might try commenting it out later and see if anything goes wrong.
+my $move; ## variable to hold the current move (whether the user's or not).
 ## The next line processes the initial position $fen by calling the subroutine named &processfen, and puts the results in several variables. 
-## Feel free to jump down to the section a couple hundred lines below which starts says "sub processfen", where this subroutine is defined
+## Feel free to jump down to the section a couple hundred lines below which says "sub processfen", where this subroutine is defined
 my ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@restofstuff) = &processfen($fen);
 ## If Black is moving first and we're recording a PGN, we need to print the move number followed by 3 dots (as the placeholder for white's missing move). That just comes from the standard for PGN files. 
 if ($pgnflag and $setupflag and $side2move eq "b")  
@@ -146,18 +146,18 @@ my $movestarttime = new Benchmark;  ## This is used to time how long moves take
 if ($movessince >= 100) ## $movessince counts half-moves since the last pawn move or capture, so it needs to get to 100 to trigger the automatic draw 
 {       print "The game is drawn because both sides have just been running around like idiots and more than 50 moves have elapsed without a pawn move or capture, for crying out loud!\n\n";
         if ($pgnflag) ## this is true if the user requested a PGN output
-        {       &writeresult("draw",$tmpfilename,$filename); ## The &writeresult subroutine writes the given result to the give PGN files
+        {       &writeresult("draw",$tmpfilename,$filename); ## The &writeresult subroutine writes the given result to the PGN file
         }
         exit;  ## this ends the RLM program
 }
-my $checkflag = &incheck($okcastle,$enpassant,@restofstuff);
-# Call the subroutine which makes the moves list!!
+my $checkflag = &incheck($okcastle,$enpassant,@restofstuff); ## Checks whether the current player is in check
+# Call the subroutine which makes the moves list!! ## Note, this list is of all possible moves of the current player's pieces, irrespective of check, en pessant, or castling.
 my @curmoveslist = &makemoveslist($checkflag,$okcastle,$enpassant,@restofstuff);
 #print "Current moves list is: @curmoveslist\n\n";
-my @cmlalg = &cart2alg(@curmoveslist);
+my @cmlalg = &cart2alg(@curmoveslist); ## translates the current list of moves from cartesian coordinates to algebraic notation.
 #print "Current moves are: \n@cmlalg\n\n";
-my @legalmoveslist;
-foreach my $move (@cmlalg){ #(@curmoveslist){
+my @legalmoveslist; ## list to hold all legal moves
+foreach my $move (@cmlalg){
         my $newfen = &makenewfen($move, $fen);
         my ($okcastle,$enpassant,$movessince,$totalmoves,$side2move,@newrestofstuff) = &processfen($newfen);
         #print "gargling \$newfen enpassant is $enpassant\n";
@@ -258,29 +258,33 @@ print "\n\nThe time for this move was ",timestr($movetime)."\n\n";
 #                       SUBROUTINES                           #
 #=============================================================#
 #===============================================================================
+## This subroutine was planned for development, but hasn't happened. It's a big project, and we don't even necessarily want to police this. People may want to create constructed non-possible boards to play from.
 sub validfen
 {
 return 1;
 }
 #===============================================================================
+## this subroutine processes and regularizes move inputs.
 sub movegrinder
 {
 my $move = shift;
 if ($move =~ /(o-o(?:-o)?)/i)
-{        return lc($1);
+{        return lc($1); ## regularize the case of castling moves
 }
 my $editmove;
-$move =~ s/^(\w\d)/P$1/;
-$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/;
+$move =~ s/^(\w\d)/P$1/; ## if the move is lacking a piece identifier, add in "P" at the front as the piece id
+$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/; ## parens here form matching groups that the following variables then assign from; e.g. "(\w)?" is the first group, indicating the piece; (\w\d) is the second group, grabbing the location the piece is moving from, and so on.
 my $piece = $1;
 my $startsquare = $2;
 my $endsquare = $3;
 my $queen;
+## this next bit just tests whether the 4th group matched anything, and if so, assigns the pawn promotion piece.
 if(defined $4)
 {       $queen=$4;
 }else{
         $queen="";
 }
+## This next bit regularizes the user's input, converting to uppercase white pieces, and to lowercase for black pieces (fen convention). It's nice to give users some leeway, and then neaten up the output.
 if($userside eq "w")
 {       #$editmove = "\u$1$2$3\U$4";
         $editmove = "\u$piece$startsquare$endsquare\U$queen";
