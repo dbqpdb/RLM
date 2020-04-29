@@ -404,7 +404,7 @@ return $board;
 ## since the the last pawn move or capture ($movessince), the total number of whole moves
 ## in the game ($totalmoves), whose turn it is to move ($side2move), the positions of 
 ## all the pieces of the player whose turn it is to move (@side2move), an arbitrary and unique
-## separator ("turkeyburp") (so we can find where to break up the list later), and the 
+## separator ("turkeyblurp") (so we can find where to break up the list later), and the 
 ## positions of all the pieces of the other player (@adversary).
 ##
 ## As an overview of how it does this is, bring in the FEN string, split it into pieces
@@ -782,13 +782,13 @@ foreach my $curpiecepos (@sidetomove_cart) {
         my ($raynum,@addmoves);
         if ($movetype eq "ray") { # Move along a ray
                 for ($raynum=0; $raynum<= $#dx; ++$raynum) {
-                        @addmoves = &getraymoves($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                        @addmoves = &getraymoves($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,$separator,@sidenotmoving_cart);
                         push @moveslist, @addmoves;
                 }
         }
         elsif ($movetype eq "single") { # Take single moves in each direction
                 for ($raynum=0; $raynum<= $#dx; ++$raynum) {
-                        my ($squaretype,$move) = &getsinglemove($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                        my ($squaretype,$move) = &getsinglemove($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,$separator,@sidenotmoving_cart);
                         if ($squaretype eq "enemy" or $squaretype eq "empty") { #add the move
                                 push @moveslist, $move;
                         }
@@ -798,7 +798,7 @@ foreach my $curpiecepos (@sidetomove_cart) {
                                         #forward two if both empty and on original square, promote if you get to the end
                                         # worry about adding en passant later
                 #print "got to pawn moves \n";
-                @addmoves = &getpawnmoves($enpassant,$piecetype,$curx,$cury,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                @addmoves = &getpawnmoves($enpassant,$piecetype,$curx,$cury,@sidetomove_cart,$separator,@sidenotmoving_cart);
                 push @moveslist, @addmoves;
         }
 } # end of piece loop
@@ -814,8 +814,8 @@ if (not $checkflag)
                 {       #print "Welcome to the world of being white and castling kingside\n";
                         if (&onlist("K51",@sidetomove_cart) and &onlist("R81",@sidetomove_cart))
                         {       #print "plus having your king and rook on the right squares\n";
-                                ($square1,$dum) = &getsinglemove("K",5,1,1,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square2,$dum) = &getsinglemove("K",5,1,2,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                                ($square1,$dum) = &getsinglemove("K",5,1,1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square2,$dum) = &getsinglemove("K",5,1,2,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
                                 #print "and your square1 is $square1 while your square2 is $square2\n";
                                 if ($square1 eq "empty" and $square2 eq "empty")
                                 {       push @moveslist, "o-o";
@@ -825,9 +825,9 @@ if (not $checkflag)
                 if ($okcastle =~ /$castlechar[1]/)# =~ /$okcastle/)   # castle queenside?
                 {       #print "Welcome to the world of being white and castling queenside\n";
                         if (&onlist("K51",@sidetomove_cart) and &onlist("R11",@sidetomove_cart))
-                        {       ($square1,$dum) = &getsinglemove("K",5,1,-1,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square2,$dum) = &getsinglemove("K",5,1,-2,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square3,$dum) = &getsinglemove("K",5,1,-3,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                        {       ($square1,$dum) = &getsinglemove("K",5,1,-1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square2,$dum) = &getsinglemove("K",5,1,-2,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square3,$dum) = &getsinglemove("K",5,1,-3,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
                                 if ($square1 eq "empty" and $square2 eq "empty" and $square3 eq "empty")
                                 {       push @moveslist, "o-o-o";
                                 }
@@ -838,8 +838,8 @@ if (not $checkflag)
         {       @castlechar = ("k","q");  #black moving
                 if ($okcastle =~ /$castlechar[0]/)# =~ /$okcastle/)   # castle kingside?
                 {       if (&onlist("k58",@sidetomove_cart) and &onlist("r88",@sidetomove_cart))
-                        {       ($square1,$dum) = &getsinglemove("k",5,8,1,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square2,$dum) = &getsinglemove("k",5,8,2,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                        {       ($square1,$dum) = &getsinglemove("k",5,8,1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square2,$dum) = &getsinglemove("k",5,8,2,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
                                 if ($square1 eq "empty" and $square2 eq "empty")
                                 {       push @moveslist, "o-o";
                                 }
@@ -847,9 +847,9 @@ if (not $checkflag)
                 }
                 if ($okcastle =~ /$castlechar[1]/)# =~ /$okcastle/)   # castle queenside?
                 {       if (&onlist("k58",@sidetomove_cart) and &onlist("r18",@sidetomove_cart))
-                        {       ($square1,$dum) = &getsinglemove("k",5,8,-1,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square2,$dum) = &getsinglemove("k",5,8,-2,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
-                                ($square3,$dum) = &getsinglemove("k",5,8,-3,0,@sidetomove_cart,"turkeyburp",@sidenotmoving_cart);
+                        {       ($square1,$dum) = &getsinglemove("k",5,8,-1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square2,$dum) = &getsinglemove("k",5,8,-2,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square3,$dum) = &getsinglemove("k",5,8,-3,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
                                 if ($square1 eq "empty" and $square2 eq "empty" and $square3 eq "empty")
                                 {       push @moveslist, "o-o-o";
                                 }
