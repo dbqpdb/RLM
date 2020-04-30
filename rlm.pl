@@ -706,29 +706,96 @@ return &onlist($ksquare,@moveslist);
 } # end of incheck
 #===============================================================================
 sub makemoveslist
-{
+{ ## The makemoveslist function is critical.  It takes in piece positions for 
+## both sides, as well as other information relevant for determining moves (whether
+## the current side is in check, whether castling is disallowed by previous moves,
+## and whether there is an en passant square which could be a capture target).
+## The expected structure of inputs is, in order:  
+## $checkflag - a 0 or 1 indicating whether the current player is in check (or, actually,
+##     just whether the current player should be considered to be in check, the &incheck 
+##     function uses this flag temporarily set to 0 even though it doesn't know yet whether
+##     the player is in check). I'll have to figure out why when reviewing the &incheck function
+## $okcastle - a string which indicates what castling options have not been disallowed by 
+##     prior moves.  It is "KQkq" if both white and black could still castle to both kingside
+##     and queenside, for example.  If white has moved his kingside rook, then kingside castling 
+##     is no longer allowed, and the string would be "Qkq" instead. If neither side can castle
+##     in either direction, the string is "-"
+## $enpassant - If the previous move was a two-square pawn move, this variable is set to the
+##     square the pawn skipped over. For the following move (and only that move), it is legal 
+##     for that pawn to be captured on the e.p. square, so we need to keep track of it. It is 
+##     the only case in chess where a capturing piece does not move onto the square the captured
+##     piece was on. 
+## @sidetomove_cart - After the $enpassant input, there is a list of piece positions for 
+##     the side to move, then the $separator, then a list of piece positions for the side
+##     which is not moving. The piece positions for the side which is moving are assembled 
+##     into the list @sidetomove_cart.  These piece locations are expected to be in cartesian
+##     form, i.e. piecename, column number, row number, like N53 for a knight on f3.
+## $separator - the marker dividing the sides pieces
+## @sidenotmoving_cart - After the separator, the piece positions for the side which isn't
+##     moving are listed, also in cartesian form.  These are assembled into @sidenotmoving_cart
+## 
+## Once the inputs are ingested, the approach is to loop over the piece positions for the 
+## side whose turn it is to move.  On each pass through the loop, one current piece position
+## is considered, and all the possible legal moves are generated from that position, based 
+## on the rules of chess for how that kind of piece moves.  We use the letter representing
+## the piece (i.e. b or B for bishop) to look up the characteristics of how the piece moves,
+## including what directions it can go, and whether it moves anywhere along a line (termed
+## a "ray" move below) or just one square (or jump for a knight) (termed a "single" move).
+## Pawns move and capture differently, and have a number of special rules, so their move type
+## is termed "pawn" and handled separately. 
+## 
+## Once the move type and basic move is specified, then the possible moves are obtained by 
+## calling other functions, namely &getraymoves, &getsinglemove, and &getpawnmoves. These 
+## functions take in the basic move directions, find the actual destination squares which 
+## correspond to those move possibilities, and return only those which are legal, by 
+## discarding any destination squares which are 1) off the board, 2) already occupied by
+## the side to move's pieces, or 3) blocked from accessing (for ray moves) by an intervening
+## piece of either side's. 
+## Each possible move deemed legal is added to the growing list of possible legal moves, 
+## @moveslist.
+## Lastly, it is considered whether castling to each side is a legal move, and should
+## therefore be added to the list of legal moves. Note that this is a separate determination
+## from the $okcastle input!  $okcastle just tells you if previous moves have disallowed
+## castling of a particular type at all, not whether castling is legal in the current 
+## board position.  The code as is looks like it prevents castling out of check and makes
+## sure that all the squares between the king and rook are empty.  However, it does not
+## look like it does anything to prevent castling THROUGH check, which is also against 
+## the rules. It is somewhat possible that this is handled elsewhere, but I haven't seen 
+## it yet if it is. 
+
+## The following (old) comment is no longer accurate, it looks like castling and e.p. 
+## captures are now handled.  
 # The purpose of this function is to build a subroutine which takes in a list of
 # piece positions and outputs, for each piece, a list of possible destination squares
 # which would be legal moves (disregarding check, e.p. and castling for now), taking
 # into account the locations of all other pieces.
-my $switch = 0;
-my (@sidetomove_cart,@sidenotmoving_cart);
-my $checkflag = shift;
-my $okcastle = shift;
-my $enpassant = shift;
-foreach my $pos (@_) {
-        if ($pos eq $separator) {
-                $switch = 1;
+my $switch = 0; ## flag to keep track of whether we have hit the $separator yet, initialized to false
+my (@sidetomove_cart,@sidenotmoving_cart); ## declaring empty lists to fill later with piece positions
+my $checkflag = shift; ## this takes the first input off the list of inputs and puts it in $checkflag
+my $okcastle = shift; ## takes the first (remaining) input off the list of inputs and puts it in $okcastle
+my $enpassant = shift; ## etc.
+foreach my $pos (@_) { ## @_ is the list of inputs to the function, minus the 3 that have already been shifted off
+        if ($pos eq $separator) { ## $pos holds the current input, which is either a piece position or the separator
+                $switch = 1; ## we have hit the $separator!
         }
         else {
-                if (!$switch) {
-                        push @sidetomove_cart, $pos;
+                if (!$switch) { ## if we haven't hit the separator yet...
+                        push @sidetomove_cart, $pos; ## add the piece position to the list of this side's pieces
                 }
-                else {
-                        push @sidenotmoving_cart, $pos;
+                else { ## if we have already hit the separator...
+                        push @sidenotmoving_cart, $pos; ## add the piece position to the list of the other side's pieces
                 }
         }
 }
+## Originally we had a check here for whether the player is in check, but that involves figuring out
+## what moves are available to the other player, which involves calling this function (&makemoveslist)
+## Which would mean that &incheck would be called again, which would mean calling &makemoveslist,
+## which would call &incheck, which would call &makemoveslist, and so on forever. Obviously, that 
+## is a problem.  The solution we settled on was to make it so that &makemoveslist basically ignores
+## check when considering move legality, and we then do a second pass through those moves and get rid 
+## of those which don't pass an &incheck test if they were actually carried out.  It's not clear that
+## this is the best approach, but it does avoid the infinite regress. 
+
 #$checkflag = &incheck($okcastle,$enpassant,@sidetomove_cart,$separator,@sidenotmoving_cart);
 #print "\n\nGot into makemoves list \n\n";
 #print "@sidetomove_cart \n\n @sidenotmoving_cart\n\n";
@@ -737,11 +804,48 @@ my @moveslist = (); # start it as an empty list
 #@sidetomove_cart = &alg2cart(@sidetomove_alg);
 #@sidenotmoving_cart = &alg2cart(@nottomove_alg);
 #print join(" ",(@sidetomove_cart,@sidenotmoving_cart,"\n"));
+
+## This next section is one of the cleverer in the RLM code, if I do say so myself.  Instead of 
+## handling the pieces completely separately, there is a main workhorse function &getsinglemove
+## which ultimately handles all moves except castling and e.p. captures. 
+## &getsinglemove can do this by accepting the starting square, a distance in columns and rows
+## to a proposed destination square, and the full list of piece positions for both sides.  
+## It returns two outputs, the first being a description of the proposed destination square
+## as either "off board", "empty", "enemy", or "friend", and the second being the move string
+## if it is a legal move, or undefined if it is not legal by reason of there being a friendly
+## piece on the destination or if the destination is off the board. The type of move is completely
+## characterized by the distance in columns and rows, so &getsinglemove works equally well for
+## knight moves, king moves, or bishop moves.  &getraymove just repeatedly calls &getsinglemove
+## with greater and greater distances until a move results in hitting a friendly piece, capturing
+## an enemy piece, or going off the board, so bishop, queen, or rook moves are all ultimately
+## handled by &getsinglemove. In a slightly trickier fashion, most pawn moves can also be determined
+## using &getsinglemove outputs, and that is what &getpawnmoves does. 
+## 
+## Before we can call &getsinglemove (or &getraymoves or &getpawnmoves), we need to set up the 
+## possible move directions, and whether the piece can move in rays or just in single moves, so
+## that is what the whole top portion of the foreach loop below does. To understand how dx and 
+## dy characterize move directions, consider the example of a rook.  A rook moves from its 
+## present location up or down columns or left or right across rows.  Moving up means increasing
+## its y coordinate while not changing its x coordinate, represented below by a dy of 1 and a
+## dx of 0 (the "d" here is short for "change in", often represented by a delta, hence the "d").
+## Moving to the right is increasing the x coordinate while not changing the y coordinate, a dx of
+## 1 and a dy of 0.  Likewise moving left is dx=-1 and dy=0, and moving down is dx=0 and dy=-1. If 
+## If you look below, these are the 4 pairs of dx and dy values listed for the rook.  They are 
+## separated into two lists, but we are going to take each in order, so the first dx value is paired
+## with the first dy value, then the second with the second, etc. So the dx,dy values are (0,1), (1,0),
+## (-1,0), and (0,-1) for the rook. Correspondingly, for the Bishop, the dx,dy values are (1,1), (1,-1),
+## (-1,-1), and (-1,1).  These represent diagonal movements because both x and y are changing at the same
+## time; respectively, they are right-and-up, right-and-down, left-and-down, and left-and-up, which are 
+## the 4 directions a bishop can move. The king and queen can move in all the directions of both the rook 
+## and the bishop, so they have 8 pairings, and the only difference between them is that the queen can 
+## move in rays, whereas the king moves just a single step. Knights also have 8 possible moves, but they 
+## take two steps in one direction and then one in a different direction.  No problem, we just have to 
+## construct the 8 legal (dx,dy) pairings for knights. 
 # Define move patterns
 # Loop over pieces
 my (@dx,@dy,$movetype);
 foreach my $curpiecepos (@sidetomove_cart) {
-        my ($piecetype,$curx,$cury) = split(//,$curpiecepos);
+        my ($piecetype,$curx,$cury) = split(//,$curpiecepos); ## split B34 (a bishop on c4), e.g. into 'B','3','4'
         #print "$curpiecepos $curx $cury\n\n";
         #$curpiece =~ /^[PNBRQK]/i;
         #$piecetype = $&;
@@ -771,23 +875,23 @@ foreach my $curpiecepos (@sidetomove_cart) {
                 $movetype = "single"; # I should probably just say "single" for these
         }
         elsif ($piecetype =~ /p/i) { # Pawn
-                # Very complicated, deal with later
+                # Very complicated, deal with later ## was dealt with, this comment is out of date
                 $movetype = "pawn";
         }
         else {
                 print "$curpiecepos \n";
-                die "Unknown piece type \"$piecetype\" \n";
+                die "Unknown piece type \"$piecetype\" \n"; ## this error kills the game if somehow a piece got onto the board which was not represented by an upper or lowercase p,k,q,r,b, or n. 
         } # end of if structure setting up rays and movement types
         # Now call the appropriate routines for making the lists of moves
         my ($raynum,@addmoves);
         if ($movetype eq "ray") { # Move along a ray
-                for ($raynum=0; $raynum<= $#dx; ++$raynum) {
+                for ($raynum=0; $raynum<= $#dx; ++$raynum) { ## loops over the dx,dy pairings
                         @addmoves = &getraymoves($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,$separator,@sidenotmoving_cart);
-                        push @moveslist, @addmoves;
+                        push @moveslist, @addmoves;  ## add returned moves to the @moveslist output list
                 }
         }
         elsif ($movetype eq "single") { # Take single moves in each direction
-                for ($raynum=0; $raynum<= $#dx; ++$raynum) {
+                for ($raynum=0; $raynum<= $#dx; ++$raynum) { ## loop over the dx,dy pairings
                         my ($squaretype,$move) = &getsinglemove($piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomove_cart,$separator,@sidenotmoving_cart);
                         if ($squaretype eq "enemy" or $squaretype eq "empty") { #add the move
                                 push @moveslist, $move;
@@ -796,33 +900,40 @@ foreach my $curpiecepos (@sidetomove_cart) {
         }
         elsif ($movetype eq "pawn") {   # Move like a pawn; forward and diagonal to capture, forward if empty,
                                         #forward two if both empty and on original square, promote if you get to the end
-                                        # worry about adding en passant later
+                                        # worry about adding en passant later ## This was handled, I believe
                 #print "got to pawn moves \n";
                 @addmoves = &getpawnmoves($enpassant,$piecetype,$curx,$cury,@sidetomove_cart,$separator,@sidenotmoving_cart);
                 push @moveslist, @addmoves;
-        }
+        } ## TODO: we should probably add an else clause here to catch possible errors in $movetype
 } # end of piece loop
+
+## TODO: we should decide whether $checkflag should be used at all in this function.  We are doing
+## more complex check verification later, and &incheck is lying to &makemoveslist by using a pretend
+## $checkflag, so it's not clear that this conditional is actually helpful.
 # See whether castling should be added to movelist
-if (not $checkflag)
-{       my ($square1,$square2,$square3,@castlechar,$dum);
+if (not $checkflag) ## castling out of check is illegal, so only consider castling if you don't think you're in check
+{       my ($square1,$square2,$square3,@castlechar,$dum); ## setting up variables to be used within this area
         #print "Welcome to the world of not being in check!\n";
-        if ($sidetomove_cart[0] eq ucfirst($sidetomove_cart[0]))
+        if ($sidetomove_cart[0] eq ucfirst($sidetomove_cart[0])) ## if your pieces are capitalized, you're White
         {       #print "In case you didn't know, you're playing white\n";
-                @castlechar = ("K","Q"); #white moving
+                @castlechar = ("K","Q"); #white moving  ## these are the characters to look for in $okcastle
                 #print "okcastle is $okcastle\n";
-                if ($okcastle =~ /$castlechar[0]/)# =~ /$okcastle/)   # castle kingside?
+                if ($okcastle =~ /$castlechar[0]/)# =~ /$okcastle/)   # castle kingside? ## true if $okcastle contains "K"
                 {       #print "Welcome to the world of being white and castling kingside\n";
-                        if (&onlist("K51",@sidetomove_cart) and &onlist("R81",@sidetomove_cart))
+                        if (&onlist("K51",@sidetomove_cart) and &onlist("R81",@sidetomove_cart)) ## checks if the king is on e1 and rook is on h1
                         {       #print "plus having your king and rook on the right squares\n";
-                                ($square1,$dum) = &getsinglemove("K",5,1,1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
-                                ($square2,$dum) = &getsinglemove("K",5,1,2,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
+                                ($square1,$dum) = &getsinglemove("K",5,1,1,0,@sidetomove_cart,$separator,@sidenotmoving_cart); ## returns "empty" if f1 is empty
+                                ($square2,$dum) = &getsinglemove("K",5,1,2,0,@sidetomove_cart,$separator,@sidenotmoving_cart); ## returns "empty" if g1 is empty
                                 #print "and your square1 is $square1 while your square2 is $square2\n";
                                 if ($square1 eq "empty" and $square2 eq "empty")
-                                {       push @moveslist, "o-o";
+                                {       ## At this point, we've verified that the FEN says kingside castling is OK,
+                                        ## that the King and Rook are on the proper squares, and that the squares between them
+                                        ## are empty. 
+                                        push @moveslist, "o-o"; ## add kingside castling to output @moveslist
                                 }
                         }
                 }
-                if ($okcastle =~ /$castlechar[1]/)# =~ /$okcastle/)   # castle queenside?
+                if ($okcastle =~ /$castlechar[1]/)# =~ /$okcastle/)   # castle queenside? ## Exact same approach for queenside...
                 {       #print "Welcome to the world of being white and castling queenside\n";
                         if (&onlist("K51",@sidetomove_cart) and &onlist("R11",@sidetomove_cart))
                         {       ($square1,$dum) = &getsinglemove("K",5,1,-1,0,@sidetomove_cart,$separator,@sidenotmoving_cart);
@@ -834,7 +945,7 @@ if (not $checkflag)
                         }
                 }
         }
-        else
+        else ## This is if black is moving instead of white.  There's a lot of duplicated code here that we should be able to refactor away
         {       @castlechar = ("k","q");  #black moving
                 if ($okcastle =~ /$castlechar[0]/)# =~ /$okcastle/)   # castle kingside?
                 {       if (&onlist("k58",@sidetomove_cart) and &onlist("r88",@sidetomove_cart))
@@ -860,6 +971,7 @@ if (not $checkflag)
 # Convert output moves back to algebraic notation
 # Maybe we're just going to use the cartesian, so I'll leave that out for now
 return @moveslist     # doesn't need to be returned, because it's global, but it doesn't hurt I guess
+## Comment on line above is a lie!  @moveslist is not global, and does need to be returned!
 } # end of makemoveslist
 #===============================================================================
 sub getraymoves
