@@ -1119,17 +1119,27 @@ return $epmove;
 }# end of enpassant
 #===============================================================================
 sub getsinglemove
-{
+{ ## This subroutine has two outputs. The second one is either the move string 
+  ## for a single move or "undefined" if the move would be off the board or onto
+  ## a friendly piece.  The first output is a string describing the square type 
+  ## of the proposed destination square, classifying it as either "empty", "friend"
+  ## (if occupied by a friendly piece), "enemy" (if occupied by an enemy piece), or 
+  ## "off board" if unoccupied. The inputs are, in order, the piece (e.g. "B"), the 
+  ## current x coord of the piece (e.g. 3), the current y coord of the piece (e.g. 1),
+  ## the x column change to get to the proposed destination square (e.g. 3 to move 3 
+  ## columns to the right), the y row change to get to the proposed destination square 
+  ## (e.g. 3 to move 3 rows up), and then all of the friendly pieces, the separator, 
+  ## and all of the enemy pieces.
 # find the square which is dx dy away, and if it is on the board and unoccupied, then it's a legal move.
 # if it is off the board or occupied by a friendly piece, then it's not a legal move.
 # if it's an enemy piece, then its a legal capture
 # inputs are   $piecetype,$curx,$cury,$dx[$raynum],$dy[$raynum],@sidetomovepos,"side not moving is after this",@sidenotmovingpos
 # outputs should be the destination square type (one of empty, off board, friend, or enemy) and the move (e.g. Bh8, or B88 depending on formatting)
 #process inputs
-my ($ptype,$x,$y,$dx,$dy,@poslist)= @_;
-my $newx = $x+$dx;
-my $newy = $y+$dy;
-my $newpos = $newx . $newy;
+my ($ptype,$x,$y,$dx,$dy,@poslist)= @_; ## unpack inputs
+my $newx = $x+$dx; ## figure out x coordinate of destination square
+my $newy = $y+$dy; ## y coordinate of destination square
+my $newpos = $newx . $newy; ## combine the two (this is now a two digit string)
 # Short circuit the checking if the new square is off the board
 if ($newx > 8 || $newx < 1 || $newy < 1 || $newy > 8) {
         # off the board
@@ -1137,32 +1147,41 @@ if ($newx > 8 || $newx < 1 || $newy < 1 || $newy > 8) {
         return ("off board", undef );
 }
 #divide up poslist
-my $switchtonotmoving = 0;
-my (@sidetomovexy, @sidenotmovingxy);
+my $switchtonotmoving = 0; ## 0 until $separator is hit, 1 afterward
+my (@sidetomovexy, @sidenotmovingxy); ## declare new lists to hold just the XY locations of the pieces
 #print "Poslist is: @poslist \n";
 # loop over positions in list, placing each into the moving or not moving list
 my (@splitpos,$posy,$posx,$posxy);
-foreach my $pos (@poslist) {
+foreach my $pos (@poslist) { ## poslist holds all piece positions, separated by $separator
         if ($pos eq $separator) {
-                $switchtonotmoving = 1;
+                $switchtonotmoving = 1; ## mark that we've passed the $separator
         }
-        else {
+        else { ## $pos holds a piece position (like "B31" for a white Bishop on c1)
                 # just want the board position, not the piece
-                @splitpos = split(//,$pos);
-                $posy = pop @splitpos;
-                $posx = pop @splitpos;
-                $posxy = $posx . $posy;
-                if ($switchtonotmoving) {
-                        push @sidenotmovingxy, $posxy;
+                @splitpos = split(//,$pos); ## split piece position into individual characters ("B","3","1")
+                $posy = pop @splitpos; ## pop takes the last element off the list, which is the y coord
+                $posx = pop @splitpos; ## pops the next element off the end of the list, which is now the x coord
+                $posxy = $posx . $posy; ## re-assemble into a 2-character string, (like "31")
+                if ($switchtonotmoving) { ## if we've hit the separator already...
+                        push @sidenotmovingxy, $posxy; ## Add xy location to list of adversary occupied squares
                 }
-                else {
-                        push @sidetomovexy, $posxy;
+                else { ## if we haven't hit the separator yet...
+                        push @sidetomovexy, $posxy; ## Add xy location to list of friend-occupied squares
                 }
         }
 }
+## $newpos holds the proposed destination square xy.  The next conditional
+## series checks whether that proposed destination square is on the list of
+## occupied friendly squares, on the list of occupied enemy squares, or is
+## on neither list (in which case it is empty).  If the square is friend-
+## occupied, then you can't move there.  If the square is enemy-occupied,
+## you can move there, and the move is a capture (should have an "x" in it).
+## If the square is empty, you can move there and the move is not a capture.
+## &onlist is a subroutine which returns true if the first input matches any
+## of the rest of the inputs. 
 # now lists are constructed, next thing is to check whether there newpos one either list
 my ($squaretype, $move);
-if (&onlist($newpos,@sidetomovexy)) {
+if (&onlist($newpos,@sidetomovexy)) { 
         $squaretype = "friend";
         $move = undef;
 }
@@ -1174,7 +1193,9 @@ else { # empty board location
         $squaretype = "empty";
         $move = $ptype.$x.$y . $newpos;
      }
-return ($squaretype,$move)
+return ($squaretype,$move)  ## return the square type and move.  
+## If the square type is "off board" or "friend", $move will be undefined,
+## otherwise, it will hold the string representing the move (e.g. "B31x64" for Bc1xf4)
 } # end of getsinglemove
 #===============================================================================
 sub garglelegalcastle
