@@ -1154,4 +1154,8 @@ $sentence =~ s/ ,/,/g;
 $sentence =~ s/,,/,/g;
 print $sentence;
 return $sentence;
-}
+
+
+
+#Bryan commenting here.  Learning github and terminal.  Cloned from github, opened the file in vim, somehow managed to start typing even though it didn't let me at first, and now I'm going to try and commit this change back to github.
+
