@@ -14,7 +14,8 @@ use strict; ## makes it so that all local variables have to be declared with "my
 use vars '$separator', '$userside','$enginename'; ## declares these three variable names to be global within this package
 use Benchmark; ## the Benchmark module is used for timing, it's used below to report how long moves took
 $enginename = "RLMv0.96"; # making a change here for testing branch commit
-$separator = "turkeyblurp"; ## I think we use this as a unique separator string below (I'll verify and come back later)
+$separator = "turkeyburp"; ## I think we use this as a unique separator string below (I'll verify and come back later)
+
 print "Welcome to the RLM Engine. Would you like to play a game of chess? (yep/nope): ";
 my $input = <>; ## This gets keyboard input from the terminal and puts it in the variable $input
 my ($fen, $correct); ## This declares two variables without assigning anything to them
