@@ -1,4 +1,5 @@
 #!/usr/local/bin/perl
+## TEST ##
 ## I'm adding comments to the original code to try to explain as much as possible
 ## what is happening.  These new comments will all start with two # signs to distinguish
 ## them from pre-existing comments. I am going to refrain from changing the code on this
@@ -302,7 +303,7 @@ if ($move =~ /(o-o(?:-o)?)/i)
 }
 my $editmove;
 $move =~ s/^(\w\d)/P$1/; ## if the move is lacking a piece identifier, add in "P" at the front as the piece id
-$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/; ## parens here form matching groups that the following variables then assign from; e.g. "(\w)?" is the first group, indicating the piece; (\w\d) is the second group, grabbing the location the piece is moving from, and so on.
+$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/; ## parens here form matching groups that the following variables then assign from; e.g. "(\w)?" is the first group, indicating the piece; (\w\d) is the second group, grabbing the location the piece is moving from, and so on. At the moment we just throw away the "x" rather than verifying that a capture is happening.
 my $piece = $1;
 my $startsquare = $2;
 my $endsquare = $3;
