@@ -226,7 +226,7 @@ if ($side2move eq $userside)
                 {       # First time entering a non-legal move for this move
                         print "\nTut tut! I'm sorry, but that was not a legal move. If you've queened, don't forget to include \"=Q\", etc. Please try again.\n\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 } 
                 elsif ($nonLegalMoveCount==1)
@@ -237,7 +237,7 @@ if ($side2move eq $userside)
                         print "$suggestedMove";
                         print "\nWhat's your move?\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 }
                 else
@@ -249,7 +249,7 @@ if ($side2move eq $userside)
                         }
                         print "\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 }
         }
@@ -315,6 +315,8 @@ if(defined $4)
         $queen="";
 }
 ## This next bit regularizes the user's input, converting to uppercase white pieces, and to lowercase for black pieces (fen convention). It's nice to give users some leeway, and then neaten up the output.
+if($piece and $startsquare and $endsquare)
+{
 if($userside eq "w")
 {       #$editmove = "\u$1$2$3\U$4";
         $editmove = "\u$piece$startsquare$endsquare\U$queen";
@@ -324,6 +326,10 @@ else
         $editmove = "\l$piece$startsquare$endsquare\L$queen";
 }
 return $editmove;
+}
+else
+{	&warningquip();
+}
 }
 #===============================================================================
 sub formatmove
@@ -1348,6 +1354,16 @@ my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidl
 my @verb = ("make","choose","pick","select","decide on");
 my @thingy = ("your move!\n");
 my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy);
+}
+#===============================================================================
+sub warningquip
+{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to whisper','We\'d like to declare to the world');
+        my @yourmoveduh = ('your move, but instead you');
+        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted a poem ridiculing','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
+        my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Tim" you\'ve ever known', ', well, who the hell even *cares* what that was');
+	my @punc = ('?', '!', ' XP', ' :P', ' :D', 'lol!', '?!?!?', ', $#@!');
+        my @newline = ("\n");
+        my $sentence = &say(\@newline,\@statement,\@yourmoveduh,\@whatyoudid,\@object,\@punc,\@newline);
 }
 #===============================================================================
 sub say
