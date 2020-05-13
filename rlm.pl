@@ -1319,32 +1319,32 @@ unlink ($tmpfilename); #delete temporary file
 }#end of writeresult
 #===============================================================================
 sub sillytalk
-{       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!');
-        my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen');
-        my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed');
-        my @object = ('me!', 'you!', 'sweet Jesus!', 'my pants!', 'yer\' pants!', 'all of Zimbabwe!','Danny\'s fanny!','Mike\'s tyke!','a bunch of hypocrites!','themselves!');
+{       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!','Holy snickerdoodles!','Sweet spirit of Elsie the Cow!','Blimey!','Shiver me timbers!','Great balls of felt!');
+        my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousin once removed','The ghost of your childhood hamster');
+        my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed','tripped','spun around and zoomed','gyrated wildly','spooked','smelled','zoomed');
+        my @object = ('me!', 'you!', 'sweet Jesus!', 'my pants!', 'yer\' pants!', 'all of Zimbabwe!','Danny\'s fanny!','Mike\'s tyke!','a bunch of hypocrites!','themselves!','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself.  You know the one I\'m talking about.');
         my @newline = ("\n");
         my $sentence = &say(\@exclam,\@subject,\@verb,\@object,\@newline);
 }
 #===============================================================================
 sub wisdomtalk
 {# when the engine is moving, in place of I in my infinite wisdom
-my @put = ("Put","Gently place","Stick","Jam","Put your back into it, and squeeze");
-my @this = ("this","THIS","as much of this as you can","some of this","a bit of this","anything resembling this","a bunch of this");
-my @prep = ("in","on","underneath","somewhere in the vicinity of","twenty paces due east from","inside","in the depths of","beside","next to", "at the appropriate time, upon", "betwixt Cleveland and");
-my @possess = ("your","your","your","Bob's","your King's","the King's","Ben Franklin's","Bobby Fischer's","Kermit the Frog's","a bearded man's","your mother's","a monkey's uncle's","... You remember that fellow you met yesterday? ... His","any random person's");
-my @object = ("pipe","car","mailbox","polka-dotted underwear","toupee","cubicle","hot rod","troubled conscience","toothbrush","pants","left nostril");
+my @put = ("Put","Gently place","Stick","Jam","Put your back into it, and squeeze","Insert","Ram repeatedly","Slide");
+my @this = ("this","THIS","as much of this as you can","some of this","a bit of this","anything resembling this","a bunch of this","more than some but less than a lot of this","a skosh of this","all of this and more of this","just a teensy bit of this");
+my @prep = ("in","on","underneath","somewhere in the vicinity of","twenty paces due east from","inside","in the depths of","beside","next to", "at the appropriate time, upon", "betwixt Cleveland and","sort of around","in eyesight of","in earshot of","in arm's reach of");
+my @possess = ("your","your","your","Bob's","your King's","the King's","Ben Franklin's","Bobby Fischer's","Kermit the Frog's","a bearded man's","your mother's","a monkey's uncle's","... You remember that fellow you met yesterday? ... His","any random person's","your cousin's","your uncle's best friend's cat's");
+my @object = ("pipe","car","mailbox","polka-dotted underwear","toupee","cubicle","hot rod","troubled conscience","toothbrush","pants","left nostril","litter box","mailbox","bomb shelter","attic","shed");
 my @and = ("and");
-my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initals on","make a gift of");
+my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initals on","make a gift of","bequeath","stare at","glare at","hold a mighty grudge against","shake your booty at");
 my @it = ("it!\nRLM Move: ");
 my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it);
 }
 #===============================================================================
 sub prompttalk
 {
-my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,");
-my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",", in a manner agreeable to you,");
-my @verb = ("make","choose","pick","select","decide on");
+my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is about Pete anyway?  What about for Jim's sake?), c'mon already");
+my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",",in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously");
+my @verb = ("make","choose","pick","select","decide on","opt for","commit to");
 my @thingy = ("your move!\n");
 my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy);
 }
@@ -1364,4 +1364,4 @@ return $sentence;
 
 
 #Bryan commenting here.  Learning github and terminal.  Cloned from github, opened the file in vim, somehow managed to start typing even though it didn't let me at first, and now I'm going to try and commit this change back to github.
-
+}
