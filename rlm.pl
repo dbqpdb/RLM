@@ -1375,6 +1375,7 @@ foreach (@_)
 my $sentence = join(" ",@sentence);
 $sentence =~ s/ ,/,/g;
 $sentence =~ s/,,/,/g;
+# how come this prints and also returns the sentence?
 print $sentence;
 return $sentence;
 }
