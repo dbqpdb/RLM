@@ -1,4 +1,5 @@
 #!/usr/local/bin/perl
+## TEST ##
 ## I'm adding comments to the original code to try to explain as much as possible
 ## what is happening.  These new comments will all start with two # signs to distinguish
 ## them from pre-existing comments. I am going to refrain from changing the code on this
@@ -225,7 +226,7 @@ if ($side2move eq $userside)
                 {       # First time entering a non-legal move for this move
                         print "\nTut tut! I'm sorry, but that was not a legal move. If you've queened, don't forget to include \"=Q\", etc. Please try again.\n\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 } 
                 elsif ($nonLegalMoveCount==1)
@@ -236,7 +237,7 @@ if ($side2move eq $userside)
                         print "$suggestedMove";
                         print "\nWhat's your move?\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 }
                 else
@@ -248,7 +249,7 @@ if ($side2move eq $userside)
                         }
                         print "\nEnter move: ";
                         chomp ($usermove = <>);
-                        $usermove = &movegrinder($usermove);
+                        $usermove = &movegrinder($usermove) or &formatWarningQuip;
                         $nonLegalMoveCount++;
                 }
         }
@@ -302,7 +303,7 @@ if ($move =~ /(o-o(?:-o)?)/i)
 }
 my $editmove;
 $move =~ s/^(\w\d)/P$1/; ## if the move is lacking a piece identifier, add in "P" at the front as the piece id
-$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/; ## parens here form matching groups that the following variables then assign from; e.g. "(\w)?" is the first group, indicating the piece; (\w\d) is the second group, grabbing the location the piece is moving from, and so on.
+$move =~ /(\w)?(\w\d)x?(\w\d)(=[bnrqBNRQ])?/; ## parens here form matching groups that the following variables then assign from; e.g. "(\w)?" is the first group, indicating the piece; (\w\d) is the second group, grabbing the location the piece is moving from, and so on. At the moment we just throw away the "x" rather than verifying that a capture is happening.
 my $piece = $1;
 my $startsquare = $2;
 my $endsquare = $3;
@@ -314,6 +315,8 @@ if(defined $4)
         $queen="";
 }
 ## This next bit regularizes the user's input, converting to uppercase white pieces, and to lowercase for black pieces (fen convention). It's nice to give users some leeway, and then neaten up the output.
+if($piece and $startsquare and $endsquare)
+{
 if($userside eq "w")
 {       #$editmove = "\u$1$2$3\U$4";
         $editmove = "\u$piece$startsquare$endsquare\U$queen";
@@ -323,6 +326,10 @@ else
         $editmove = "\l$piece$startsquare$endsquare\L$queen";
 }
 return $editmove;
+}
+else
+{	&warningquip();
+}
 }
 #===============================================================================
 sub formatmove
@@ -1349,6 +1356,16 @@ my @thingy = ("your move!\n");
 my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy);
 }
 #===============================================================================
+sub warningquip
+{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to whisper','We\'d like to declare to the world');
+        my @yourmoveduh = ('your move, but instead you');
+        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted a poem ridiculing','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
+        my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Tim" you\'ve ever known', ', well, who the hell even *cares* what that was');
+	my @punc = ('?', '!', ' XP', ' :P', ' :D', 'lol!', '?!?!?', ', $#@!');
+        my @newline = ("\n");
+        my $sentence = &say(\@newline,\@statement,\@yourmoveduh,\@whatyoudid,\@object,\@punc,\@newline);
+}
+#===============================================================================
 sub say
 {#say will receive an array of references to arrays
 my @sentence;
@@ -1358,6 +1375,7 @@ foreach (@_)
 my $sentence = join(" ",@sentence);
 $sentence =~ s/ ,/,/g;
 $sentence =~ s/,,/,/g;
+# how come this prints and also returns the sentence?
 print $sentence;
 return $sentence;
 
