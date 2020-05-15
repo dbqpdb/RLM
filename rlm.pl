@@ -1368,7 +1368,7 @@ sub sillytalk
 {       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!','Holy snickerdoodles!','Sweet spirit of Elsie the Cow!','Blimey!','Shiver me timbers!','Great balls of felt!');
         my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousin once removed','The ghost of your childhood hamster');
         my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed','tripped','spun around and zoomed','gyrated wildly','spooked','smelled','zoomed');
-        my @object = ('me!', 'you!', 'sweet Jesus!', 'my pants!', 'yer\' pants!', 'all of Zimbabwe!','Danny\'s fanny!','Mike\'s tyke!','a bunch of hypocrites!','themselves!','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself.  You know the one I\'m talking about.');
+        my @object = ('me', 'you', 'sweet Jesus', 'my pants', 'yer\' pants', 'all of Zimbabwe','Danny\'s fanny','Mike\'s tyke','a bunch of hypocrites','themselves','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself.  You know the one I\'m talking about');
         my @punc = ("!", ".", "!!!", "! XP");
         my $sentence = &say(\@exclam,\@subject,\@verb,\@object,\@punc);
 }
@@ -1402,7 +1402,7 @@ sub warningquip
         my @yourmoveduh = ('your move, but instead you');
         my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted a poem ridiculing','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
         my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Tim" you\'ve ever known', ', well, who the hell even *cares* what that was');
-	my @punc = ('?', '!', ' XP', ' :P', ' :D', 'lol!', '?!?!?', ', $#@!');
+	my @punc = ('?', '!', '. XP', '. :P', '. :D', '. lol!', '?!?!?', '; $#@!, man!');
         my $sentence = &say(\@statement,\@yourmoveduh,\@whatyoudid,\@object,\@punc);
 }
 #===============================================================================
@@ -1415,12 +1415,7 @@ foreach (@_)
 my $sentence = join(" ",@sentence[0..$#sentence-1]);
 $sentence = $sentence . $sentence[$#sentence] . "\n";
 $sentence =~ s/ ,/,/g;
+$sentence =~ s/,,/,/g;
 print $sentence; 
 }
-#==============================================================================
-sub mutter
-{
-	print "<<sillytalk>>\n";
 
-	
-}
