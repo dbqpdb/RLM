@@ -1366,7 +1366,7 @@ unlink ($tmpfilename); #delete temporary file
 #===============================================================================
 sub sillytalk
 {       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!','Holy snickerdoodles!','Sweet spirit of Elsie the Cow!','Blimey!','Shiver me timbers!','Great balls of felt!');
-        my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousin once removed','The ghost of your childhood hamster');
+        my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousin once removed','The ghosts of your childhood hamsters');
         my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed','tripped','spun around and zoomed','gyrated wildly','spooked','smelled','zoomed');
         my @object = ('me', 'you', 'sweet Jesus', 'my pants', 'yer\' pants', 'all of Zimbabwe','Danny\'s fanny','Mike\'s tyke','a bunch of hypocrites','themselves','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself.  You know the one I\'m talking about');
         my @punc = ("!", ".", "!!!", "! XP");
@@ -1389,7 +1389,7 @@ my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it,\@p
 #===============================================================================
 sub prompttalk
 {
-my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is about Pete anyway?  What about for Jim's sake?), c'mon already");
+my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is it always about Pete anyway?  What about Jim's sake?), c'mon already");
 my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",",in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously");
 my @verb = ("make","choose","pick","select","decide on","opt for","commit to");
 my @thingy = ("your move");
