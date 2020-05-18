@@ -112,7 +112,7 @@ print "Should I record the moves of this game in a PGN file? (yep/nope):";
 $input = <>; ## get user response to whether there should be a PGN record of the game
 my $pgnflag = 0; ## initialize this to false. we'll change it to true if the user has said yes
 my ($filename,$username,$site,$white,$black,$date,$tmpfilename); ## declare several variables without setting them
-my $setupflag = 0; ## initalize to false.  This variable is to track whether the starting position is not the normal starting position
+my $setupflag = 0; ## initialize to false.  This variable is to track whether the starting position is not the normal starting position
 if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if so, we need to set up the PGN file
 {       print "What file would you like to record to?\nFilename: ";
         chomp($filename = <>); ## gather user response for name of pgn file
@@ -1381,7 +1381,7 @@ my @prep = ("in","on","underneath","somewhere in the vicinity of","twenty paces 
 my @possess = ("your","your","your","Bob's","your King's","the King's","Ben Franklin's","Bobby Fischer's","Kermit the Frog's","a bearded man's","your mother's","a monkey's uncle's","... You remember that fellow you met yesterday? ... His","any random person's","your cousin's","your uncle's best friend's cat's");
 my @object = ("pipe","car","mailbox","polka-dotted underwear","toupee","cubicle","hot rod","troubled conscience","toothbrush","pants","left nostril","litter box","mailbox","bomb shelter","attic","shed");
 my @and = ("and");
-my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initals on","make a gift of","bequeath","stare at","glare at","hold a mighty grudge against","shake your booty at");
+my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initials on","make a gift of","bequeath","stare at","glare at","hold a mighty grudge against","shake your booty at");
 my @it = ("it");
 my @punc = ("!");
 my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it,\@punc);
@@ -1389,8 +1389,8 @@ my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it,\@p
 #===============================================================================
 sub prompttalk
 {
-my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is it always about Pete anyway?  What about Jim's sake?), c'mon already");
-my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",",in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously");
+my @goahead = ("Go ahead,","I triple-dog dare you!,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is it always about Pete anyway?  What about Jim's sake?), c'mon already");
+my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",", in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously");
 my @verb = ("make","choose","pick","select","decide on","opt for","commit to");
 my @thingy = ("your move");
 my @punc = ("!", "!!!","...!");
@@ -1398,12 +1398,13 @@ my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy,\@punc);
 }
 #===============================================================================
 sub warningquip
-{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to whisper','We\'d like to declare to the world');
-        my @yourmoveduh = ('your move, but instead you');
-        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted a poem ridiculing','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
+{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to sexily whisper','We\'d like to declare to the world', 'Pardner, you\'d best\'ve done');
+        my @yourmoveduh = ('your move', 'some kind of move', 'something like a move');
+	my @instead = (', but instead you', '; but what was that about when you', ', but I suppose it was interesting when you');
+        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted','composed a sonnet about','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
         my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Tim" you\'ve ever known', ', well, who the hell even *cares* what that was');
-	my @punc = ('?', '!', '. XP', '. :P', '. :D', '. lol!', '?!?!?', '; $#@!, man!');
-        my $sentence = &say(\@statement,\@yourmoveduh,\@whatyoudid,\@object,\@punc);
+	my @punc = ('?', '!', '. XP', '. :P', '. :D', '. lol!', '?!?!?', '; $#!+, man!');
+        my $sentence = &say(\@statement,\@yourmoveduh,\@instead,\@whatyoudid,\@object,\@punc);
 }
 #===============================================================================
 sub say
