@@ -1417,6 +1417,7 @@ my $sentence = join(" ",@sentence[0..$#sentence-1]);
 $sentence = $sentence . $sentence[$#sentence] . "\n";
 $sentence =~ s/ ,/,/g;
 $sentence =~ s/,,/,/g;
+$sentence =~ s/ ;/;/g;
 print $sentence; 
 }
 
