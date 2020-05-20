@@ -13,9 +13,48 @@
 use warnings;
 use strict; ## makes it so that all local variables have to be declared with "my"
 use vars '$separator', '$userside','$enginename'; ## declares these three variable names to be global within this package
+use Scalar::Util qw(looks_like_number);
 use Benchmark; ## the Benchmark module is used for timing, it's used below to report how long moves took
 $enginename = "RLMv0.96"; # making a change here for testing branch commit
 $separator = "turkeyburp"; ## I think we use this as a unique separator string below (I'll verify and come back later)
+
+if ($#ARGV == 0) {
+	print "Hmmm. Yes, yes. I hear what you're saying, but I'm not sure what to do with that comment...\n";
+	exit;
+}
+elsif ($#ARGV == 1 and ($ARGV[0] eq "-mutter" or $ARGV[0] eq "mutter") and looks_like_number($ARGV[1])){
+	if ($ARGV[1] > 0){
+		my $times = $ARGV[1];
+		
+		print "\n<<sillytalk>>\n";
+		for (my $i=0; $i<$times; $i++) {
+			&sillytalk;
+		}
+
+		print "\n<<wisdomtalk>>\n";
+		for (my $i=0; $i<$times; $i++) {
+			&wisdomtalk;
+		}
+
+		print "\n<<prompttalk>>\n";
+		for (my $i=0; $i<$times; $i++) {
+			&prompttalk;
+		}
+
+		print "\n<<warningquip>>\n";
+		for (my $i=0; $i<$times; $i++) {
+			&warningquip;
+		}
+		exit;
+	} else {
+		print "I have no idea what you mean by \"" . $ARGV[0] . "\", and \"" . $ARGV[1] . "\", but it can't be good...\n";
+		exit;
+	}
+}
+elsif ($#ARGV > 0) {
+	print "\nDon't babble at the command line! Please submit your exotic arguments elsewhere.\n";
+	exit
+}
 
 print "Welcome to the RLM Engine. Would you like to play a game of chess? (yep/nope): ";
 my $input = <>; ## This gets keyboard input from the terminal and puts it in the variable $input
@@ -73,7 +112,7 @@ print "Should I record the moves of this game in a PGN file? (yep/nope):";
 $input = <>; ## get user response to whether there should be a PGN record of the game
 my $pgnflag = 0; ## initialize this to false. we'll change it to true if the user has said yes
 my ($filename,$username,$site,$white,$black,$date,$tmpfilename); ## declare several variables without setting them
-my $setupflag = 0; ## initalize to false.  This variable is to track whether the starting position is not the normal starting position
+my $setupflag = 0; ## initialize to false.  This variable is to track whether the starting position is not the normal starting position
 if ($input =~ /y/i) ## check if user response about PGN file contains a "y", if so, we need to set up the PGN file
 {       print "What file would you like to record to?\nFilename: ";
         chomp($filename = <>); ## gather user response for name of pgn file
@@ -262,7 +301,7 @@ else
         my $rand = sprintf("%i",rand($#legalmoveslist_alg+1));
         $move = $legalmoveslist_alg[$rand];
         &wisdomtalk;
-        print "$move\n\n";
+        print "RLM move: $move\n\n";
         sleep(4);
         #print "I in my infinite wisdom, choose to play: $move\n\n";
 }
@@ -1326,44 +1365,46 @@ unlink ($tmpfilename); #delete temporary file
 }#end of writeresult
 #===============================================================================
 sub sillytalk
-{       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!','Holy snickerdoodles!','Sweet spirit of Elsie the Cow!','Blimey!','Shiver me timbers!','Great balls of felt!');
-        my @subject = ('Rats','Crickets','Chimps','Crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousin once removed','The ghost of your childhood hamster');
-        my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed','tripped','spun around and zoomed','gyrated wildly','spooked','smelled','zoomed');
-        my @object = ('me!', 'you!', 'sweet Jesus!', 'my pants!', 'yer\' pants!', 'all of Zimbabwe!','Danny\'s fanny!','Mike\'s tyke!','a bunch of hypocrites!','themselves!','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself.  You know the one I\'m talking about.');
-        my @newline = ("\n");
-        my $sentence = &say(\@exclam,\@subject,\@verb,\@object,\@newline);
+{       my @exclam = ('Well!','See here!','I see!','Err...','Oh!','Goodness!','Heavens!','My oh my!','Jiminy!','Gracious me!','Holy snickerdoodles!','Sweet spirit of Elsie the Cow!','Blimey!','Shiver me timbers!','Great balls of felt!','Whoa!','WHAT?!?','Huh!','Never thought I\'d see the day!');
+        my @subject = ('Rats','Gay crickets','Chimps','Curmudgeonly crocodiles','Elephants','Bats', 'Armadillos','Martians','Minions of the underworld','Michael Jackson\'s relatives','Many tiny Englishmen','Midges','A herd of flea-ridden camels','Your sister\'s college roommate\'s third cousins once removed','The ghosts of your childhood hamsters','Too few naked lumberjacks','One or two bedazzled miscreants','A gaggle of deeply misunderstood sea anemones');
+        my @verb = ('slam dunk','mame lame, then blame','lug a plank and spank','chomp-chomp-chomp','smack the heck out of','wreak havoc on','failed to notice','just up and telephoned','body-slammed','tripped','spun around and zoomed','gyrated wildly before','spooked','smelled','zoomed','hurled undeserved aspersions upon');
+        my @object = ('me', 'you', 'sweet Jesus', 'my pants', 'yer\' pants', 'all of Zimbabwe','Danny\'s fanny','Mike\'s tyke','a bunch of hypocrites','themselves','your neighbors','your cousin\'s pet','that one guy who is always wandering around talking to himself. You know the one I\'m talking about','Moby Duck','nihilism','my sense of dignity and decorum');
+        my @punc = ("!", ".", "!!!", "! XP");
+        my $sentence = &say(\@exclam,\@subject,\@verb,\@object,\@punc);
 }
 #===============================================================================
 sub wisdomtalk
 {# when the engine is moving, in place of I in my infinite wisdom
-my @put = ("Put","Gently place","Stick","Jam","Put your back into it, and squeeze","Insert","Ram repeatedly","Slide");
-my @this = ("this","THIS","as much of this as you can","some of this","a bit of this","anything resembling this","a bunch of this","more than some but less than a lot of this","a skosh of this","all of this and more of this","just a teensy bit of this");
+my @put = ("Put","Gently place","Stick","Jam","Put your back into it, and squeeze","Insert","Ram repeatedly","Slide","Catapult","Sling");
+my @this = ("this","THIS","as much of this as you can","some of this","a bit of this","anything resembling this","a bunch of this","more than some but less than a lot of this","a skosh of this","all of this and more of this","just a teensy bit of this","that... wait, where's it gone? I mean *this*");
 my @prep = ("in","on","underneath","somewhere in the vicinity of","twenty paces due east from","inside","in the depths of","beside","next to", "at the appropriate time, upon", "betwixt Cleveland and","sort of around","in eyesight of","in earshot of","in arm's reach of");
 my @possess = ("your","your","your","Bob's","your King's","the King's","Ben Franklin's","Bobby Fischer's","Kermit the Frog's","a bearded man's","your mother's","a monkey's uncle's","... You remember that fellow you met yesterday? ... His","any random person's","your cousin's","your uncle's best friend's cat's");
-my @object = ("pipe","car","mailbox","polka-dotted underwear","toupee","cubicle","hot rod","troubled conscience","toothbrush","pants","left nostril","litter box","mailbox","bomb shelter","attic","shed");
+my @object = ("pipe","car","mailbox","polka-dotted underwear","toupee","cubicle","hot rod","troubled conscience","toothbrush","pants","left nostril","litter box","mailbox","bomb shelter","attic","shed","first Bollywood appearance","childhood remembrance","dirty magazine","kungfu school","pyramid scheme");
 my @and = ("and");
-my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initals on","make a gift of","bequeath","stare at","glare at","hold a mighty grudge against","shake your booty at");
-my @it = ("it!\nRLM Move: ");
-my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it);
+my @verb = ("smoke","eat","consider","become","pursue a vendetta against","make war upon","frighten","be frightened by","moo at","dance a jig around","emblazon your initials on","make a gift of","bequeath","stare at","glare at","hold a mighty grudge against","shake your booty at");
+my @it = ("it");
+my @punc = ("!");
+my $sentence = &say(\@put,\@this,\@prep,\@possess,\@object,\@and,\@verb,\@it,\@punc);
 }
 #===============================================================================
 sub prompttalk
 {
-my @goahead = ("Go ahead,","I triple-dog dare you,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is about Pete anyway?  What about for Jim's sake?), c'mon already");
-my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",",in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously");
-my @verb = ("make","choose","pick","select","decide on","opt for","commit to");
-my @thingy = ("your move!\n");
-my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy);
+my @goahead = ("Go ahead,","I triple-dog dare you!,", "Hurry up and","You've got to","I wonder if I could trouble you to","You know, the game can't go on until you","The Queen of England commands you to","For once in your life, why don't you","It's time to","Come on now,","It would be disappointing if you didn't","All the chess faeries will rejoice if you","Hey,","Its about time for you to","For Pete's sake (why is it always about Pete anyway?  What about Jim's sake?), c'mon already","In the name of all that is holy","If you're not going to entertain me in some other way","My friend, the time has come to","The heat death of the universe is upon us; time to");
+my @adverbs = ("randomly","carefully","provocatively","boldly","timidly","rapidly","profoundly","uncompromisingly","shut up and","resign or","perspicaciously",", in a manner agreeable to you,","less carefully","hurriedly","charmingly","speedily","maliciously","perfunctorily","drunkenly","permanently","jauntily",", as it were,","explosively","antidisestablishmentarianismly","lustily","spritedly");
+my @verb = ("make","choose","pick","select","decide on","opt for","commit to","deduce","intuit","declare","compose","broadcast","transmit");
+my @thingy = ("your move");
+my @punc = ("!", "!!!","...!");
+my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy,\@punc);
 }
 #===============================================================================
 sub warningquip
-{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to whisper','We\'d like to declare to the world');
-        my @yourmoveduh = ('your move, but instead you');
-        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted a poem ridiculing','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed');
-        my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Tim" you\'ve ever known', ', well, who the hell even *cares* what that was');
-	my @punc = ('?', '!', ' XP', ' :P', ' :D', 'lol!', '?!?!?', ', $#@!');
-        my @newline = ("\n");
-        my $sentence = &say(\@newline,\@statement,\@yourmoveduh,\@whatyoudid,\@object,\@punc,\@newline);
+{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to sexily whisper','We\'d like to declare to the world', 'Pardner, you\'d best\'ve done','If I\'ve told you once, I\'ve told you...once, give me','Great Caeser\'s ghost portended','Were you dropped as a child? I was expecting','I really expected');
+        my @yourmoveduh = ('your move', 'some kind of move', 'something like a move','any move',);
+	my @instead = (', but instead you', '; but what was that about when you', ', but I suppose it was interesting when you','but that was a different choice when you',', but unfortunately you',', but much to my chagrin you',', but everyone was rather disappointed when you');
+        my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted','composed a sonnet about','rudely intoned','sang a blues song about','pickled','made certain that no one would ever again see','body-slammed','gently rocked','throat punched','dutch ovened','boinked','legislated against','pretended not to notice','set fire to the world\'s strategic reserve of','mimed','depicted the plight of the poor with');
+        my @object = ('a pesto recipe', 'tongue stuff', 'your best impression of a leprechaun in a bowl of jello', 'a pervert', 'every "Sally" or "Humphrey" you\'ve ever known', ', well, who the hell even *cares* what that was','a steaming pile of giraffe vomit','three midgets dancing the rhumba','a barbarian hoard','the guild of time-machine repair women','my robot');
+	my @punc = ('?', '!', '. XP', '. :P', '. :D', '. lol!', '?!?!?', '; $#!+, man!');
+        my $sentence = &say(\@statement,\@yourmoveduh,\@instead,\@whatyoudid,\@object,\@punc);
 }
 #===============================================================================
 sub say
@@ -1372,14 +1413,11 @@ my @sentence;
 foreach (@_)
 {       push @sentence, $$_[sprintf("%i",rand($#$_+1))];
 }
-my $sentence = join(" ",@sentence);
+my $sentence = join(" ",@sentence[0..$#sentence-1]);
+$sentence = $sentence . $sentence[$#sentence] . "\n";
 $sentence =~ s/ ,/,/g;
 $sentence =~ s/,,/,/g;
-# how come this prints and also returns the sentence?
-print $sentence;
-return $sentence;
-
-
-
-#Bryan commenting here.  Learning github and terminal.  Cloned from github, opened the file in vim, somehow managed to start typing even though it didn't let me at first, and now I'm going to try and commit this change back to github.
+$sentence =~ s/ ;/;/g;
+print $sentence; 
 }
+
