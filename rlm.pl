@@ -1398,7 +1398,7 @@ my $sentence = &say(\@goahead,\@adverbs,\@verb,\@thingy,\@punc);
 }
 #===============================================================================
 sub warningquip
-{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to sexily whisper','We\'d like to declare to the world', 'Pardner, you\'d best\'ve done','If I\'ve told you once, I\'ve told you...once','You must have grown up in a house with lead paint','Great Caeser\'s ghost','You were dropped as a child');
+{       my @statement = ('I asked you for','Didn\'t I tell you to give me','You know, when it\'s your move in chess you should provide','Sometimes it\'s good to enter','Nicki Minaj is waiting for you to sexily whisper','We\'d like to declare to the world', 'Pardner, you\'d best\'ve done','If I\'ve told you once, I\'ve told you...once, give me','Great Caeser\'s I wanted a move and you gave me','Were you dropped as a child?  I was expecting');
         my @yourmoveduh = ('your move', 'some kind of move', 'something like a move','any move',);
 	my @instead = (', but instead you', '; but what was that about when you', ', but I suppose it was interesting when you','but that was a different choice when you');
         my @whatyoudid = ('blurted out','fantasized about','wrote an encyclopedia about','spatter-farted','composed a sonnet about','rudely intoned','sang a blues song about','pickled','rounded up all the single ladies and put a ring on','body-slammed','gently rocked','throat punched','dutch ovened');
