@@ -104,6 +104,24 @@ class Board:
     rankIdx = int(7 - np.floor(squareIdx/board_size[0]))
     return rankIdx, fileIdx
 
+def sillyMike():
+    import random
+    import time   
+
+    def backline():        
+        print('\r', end='')                     # use '\r' to go back
+
+
+    for i in range(50):                        # for 0 to 100
+        compute = random.random()
+        print("Computing... " + str(compute), end='')                        # just print and flush
+        backline()                              # back to the beginning of line    
+        time.sleep(random.random()/10)
+        backline()
+    backline()
+    print("Yes. Quite.                            " if compute else "No. Not at all.                                        ")
+
+
 def run_me_if_i_am_the_main_file():
   # This function is called if you run "python rlm.py"
   print('I am running!!!')
@@ -122,7 +140,8 @@ def run_me_if_i_am_the_main_file():
   board_array_from_FEN[4,4] = 'Q' # add a white queen at e5
   boardFromArray = Board(board_array_from_FEN)
   print('Board array generated from array: \n%s'%(str(boardFromArray.board_array)))
-
+  print("Is Mike silly?:")
+  sillyMike()
   
 
 if __name__ == '__main__':
