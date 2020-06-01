@@ -8,7 +8,6 @@ versionNumber = 0.01 # Just getting started, not at all functional
 
 import numpy as np
 import re
-from random import *
 
 # Let's start off with this as a single file and refactor it into multple files when we feel 
 # like this one is getting unwieldy
@@ -61,8 +60,7 @@ class Board:
         rows = board.split('/')
         if len(rows) != 8:
             return False
-        for row in rows:
-            whalefart = list(row)
+        for whalefart in rows:
             # if the row has a non-piece character or non 1-8 digit,
             # or the sum of represented squares is un-8-ly, return Nope
             if re.search('[^prnbqk1-8]', whalefart, re.IGNORECASE) or sum([int(x) if x.isdigit() else 1 for x in whalefart]) != 8:
@@ -81,12 +79,12 @@ class Board:
             return False
         
         boardMaybe, side, castle, enpass, halfmovecounter, turnnum = fen_fields
-        if not isValidFENboard(boardMaybe):
+        if not self.isValidFENboard(boardMaybe):
             return False
         if side not in ['w', 'b']:
             return False
         # The castling string can be 1-4 "k"s and "q"s, or the string "-"
-        if len(castle) not in [1, 2, 3]:
+        if len(castle) not in [1, 2, 3, 4]:
             return False
         if re.search('[^qk]', castle, re.IGNORECASE) and castle != '-':
             return False
@@ -94,7 +92,7 @@ class Board:
         if enpass != '-' and not (side == 'w' and re.match('^[a-h]6$', enpass)) and not (side == 'b' and re.match('^[a-h]3$', enpass)):
             return False
         # halfmovecounter starts at 0 and increments every non-capture non-pawn-advance move; movenum starts at 1 and increments after each black move. 
-        if halfmovecounter < 0 or turnnum < 0 or halfmovecounter >= 2 * turnnum:
+        if int(halfmovecounter) < 0 or int(turnnum) < 0 or int(halfmovecounter) >= 2 * int(turnnum):
             return False
         return True
   
