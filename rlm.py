@@ -49,6 +49,48 @@ class Board:
                 # Couldn't interpret board position input, throw an error
                 raise Exception("Couldn't interpret board position input as 8x8 numpy array of single characters or as FEN board position!")
 
+    def __str__(self):
+        '''This is called whenever a board is converted to a string (like when it is being printed)'''
+        # How about something like this:
+        '''
+           -------------------------------
+        8 | r | n | b | q | k | b | n | r |
+          |---|---|---|---|---|---|---|---|
+        7 | p | p | p | p | p | p | p | p |
+          |---|---|---|---|---|---|---|---|
+        6 |   |   |   |   |   |   |   |   |
+          |---|---|---|---|---|---|---|---|
+        5 |   |   |   |   |   |   |   |   |
+          |---|---|---|---|---|---|---|---|
+        4 |   |   |   |   |   |   |   |   |
+          |---|---|---|---|---|---|---|---|
+        3 |   |   |   |   |   |   |   |   |
+          |---|---|---|---|---|---|---|---|
+        2 | P | P | P | P | P | P | P | P |
+          |---|---|---|---|---|---|---|---|
+        1 | R | N | B | Q | K | B | N | R |
+           -------------------------------
+            a   b   c   d   e   f   g   h  
+        '''
+        upper_edge = '   -------------------------------\n'
+        lower_edge = upper_edge
+        internal_row_edge = '  |---|---|---|---|---|---|---|---|\n'
+        make_row_string = lambda row_num, row: '%i | %c | %c | %c | %c | %c | %c | %c | %c |\n'%(row_num, *row)
+        file_labels = '    a   b   c   d   e   f   g   h  \n'
+
+        board_string = upper_edge # start with the upper edge
+        for rank_num in range(8,0,-1):
+            row_idx = rank_num-1
+            row = list(self.board_array[row_idx,:]) # get list of piece characters (including '-' for empty squares)
+            board_string += make_row_string(rank_num, row)
+            if rank_num > 1:
+                board_string += internal_row_edge
+            else:
+                board_string += lower_edge
+        board_string += file_labels
+        return board_string
+
+
 
     def isValidFENboard(self, board: str) -> bool:
         '''
@@ -95,6 +137,7 @@ class Board:
         if int(halfmovecounter) < 0 or int(turnnum) < 0 or int(halfmovecounter) >= 2 * int(turnnum):
             return False
         return True
+      
   
     @classmethod
     def convert_FEN_to_board_array(cls, FEN):
@@ -187,6 +230,10 @@ def run_me_if_i_am_the_main_file():
     board_array_from_FEN[4,4] = 'Q' # add a white queen at e5
     boardFromArray = Board(board_array_from_FEN)
     print('Board array generated from array: \n%s'%(str(boardFromArray.board_array)))
+    # Print the board object directly
+    print('Board object printed directly:')
+    print(boardFromArray)
+    # Ask and answer critical question
     print("Is Mike silly?:")
     sillyMike()
 
