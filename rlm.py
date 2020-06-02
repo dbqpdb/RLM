@@ -54,7 +54,7 @@ class Board:
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
         # How about something like this:
         '''
-           -------------------------------
+          +-------------------------------+
         8 | r | n | b | q | k | b | n | r |
           |---|---|---|---|---|---|---|---|
         7 | p | p | p | p | p | p | p | p |
@@ -70,10 +70,10 @@ class Board:
         2 | P | P | P | P | P | P | P | P |
           |---|---|---|---|---|---|---|---|
         1 | R | N | B | Q | K | B | N | R |
-           -------------------------------
+          +-------------------------------+
             a   b   c   d   e   f   g   h  
         '''
-        upper_edge = '   -------------------------------\n'
+        upper_edge = '  +-------------------------------+\n'
         lower_edge = upper_edge
         internal_row_edge = '  |---|---|---|---|---|---|---|---|\n'
         make_row_string = lambda row_num, row: '%i | %c | %c | %c | %c | %c | %c | %c | %c |\n'%(row_num, *row)
