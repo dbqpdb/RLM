@@ -8,6 +8,7 @@ versionNumber = 0.01 # Just getting started, not at all functional
 
 import numpy as np
 import re
+from collections import defaultdict 
 
 # Let's start off with this as a single file and refactor it into multple files when we feel 
 # like this one is getting unwieldy
@@ -48,6 +49,95 @@ class Board:
             else:
                 # Couldn't interpret board position input, throw an error
                 raise Exception("Couldn't interpret board position input as 8x8 numpy array of single characters or as FEN board position!")
+
+    
+    FILE_TO_IDX_DICT = {
+        'a': 0,
+        'b': 1,
+        'c': 2,
+        'd': 3,
+        'e': 4,
+        'f': 5,
+        'g': 6,
+        'h': 7,
+        '1': 0,
+        '2': 1,
+        '3': 2,
+        '4': 3,
+        '5': 4,
+        '6': 5,
+        '7': 6,
+        '8': 7,
+        0: 0,
+        1: 1,
+        2: 2,
+        3: 3,
+        4: 4,
+        5: 5,
+        6: 6,
+        7: 7,
+    }
+    def __getitem__(self, square_name):
+        ''' Allows indexing into Board objects.  If b is a Board, then b['a3'] should return 
+        the piece which is on square a3. This function should handle indexing in pretty much any 
+        sensible way we can think of.  The actual intepretation of the square name is handled
+        by square_name_to_array_idxs(), but here are ways indexing can currently be used to 
+        access the contents of the a3 square: 
+        b['a3'] - a two-character string, a letter for the file and a number for the rank
+        b['a','3'] - two one-character strings, a letter for the file and number for the rank
+        b[0, 2] - two integers, zero-based, these are indices into the board_array (but in opposite order; file, rank instead of rank, file)
+        b['1', '3'] - two one-character strings, a number for the file and a number for the rank (one-based, not zero-based)
+        We'll need to decide as we carry on whether the non-string inputs should be allowed and if so, whether they should be
+        file, rank, (consistent with other inputs order) or rank, file (consistent with board_array index order).  
+        
+        The return value is either a 1 character string containing the case-sensitive piece name on that square, the 
+        Board.EMPTY_SQUARE string if the square was empty, or None if the square name is invalid or off the board. 
+        '''
+        file_idx, rank_idx = self.square_name_to_array_idxs(square_name)
+        if rank_idx is None or file_idx is None:
+            return None
+        else:
+            return self.board_array[rank_idx, file_idx]
+        
+    VALID_BOARD_SQUARE_CONTENTS_PATTERN = re.compile('(^[pnbrkqPNBRKQ]$)|(^%s$)' % EMPTY_SQUARE)    
+
+    def __setitem__(self, square_name, new_value):
+        ''' Allows setting of board positions via indexing expressions. If b is a Board, then 
+        b['a3'] = 'P' should place a white pawn on square 'a3' of the board. All the ways of specifiying
+        a square name allowed by square_name_to_array_idxs() are allowed. new_value must be a single 
+        character string with a case-sensitive piece name, or the Board.EMPTY_SQUARE string.
+        '''
+        assert re.match(Board.VALID_BOARD_SQUARE_CONTENTS_PATTERN, new_value), 'new_value "%s" is not a valid character to place in a Board array' % (new_value)
+        file_idx, rank_idx = self.square_name_to_array_idxs(square_name)
+        if rank_idx is None or file_idx is None:
+            Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
+        else:
+            self.board_array[rank_idx, file_idx] = new_value
+
+    def square_name_to_array_idxs(self, square_name):
+        '''This function should handle interpreting square names in pretty much any 
+        sensible way we can think of.  Here are some thoughts of how it might make sense to call
+        this:
+        'a3' - a two-character string, a letter for the file and a number for the rank
+        ['a','3'] - two one-character strings, a letter for the file and number for the rank
+        [0, 2] - two integers, zero-based, these are indices into the board_array (but in opposite order; file, rank instead of rank, file)
+        ['1', '3'] - two one-character strings, a number for the file and a number for the rank (one-based, not zero-based)
+        We'll need to decide as we carry on whether the non-string inputs should be allowed and if so, whether they should be
+        file, rank, (consistent with other inputs order) or rank, file (consistent with board_array index order).  
+        '''
+        assert len(square_name)==2, 'Board square names must have len 2 to be interpretable!'
+        # Convert first element of square name to a file index (or None if it doesn't convert)
+        file_idx = Board.FILE_TO_IDX_DICT.setdefault(square_name[0], None)
+        # Try to convert second element of square name to a rank index
+        try:
+            if isinstance(square_name[1], str):
+                rank_idx = int(square_name[1]) - 1 # go from 1-based to 0-based
+            else: 
+                rank_idx = int(square_name[1]) 
+        except:
+            # Conversion failed
+            rank_idx = None
+        return file_idx, rank_idx
 
 
     def __str__(self):
