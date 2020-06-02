@@ -15,7 +15,7 @@ import re
 class Board:
     '''A class to hold and manipulate representations of the chess board'''
 
-    EMPTY_SQUARE = '-'
+    EMPTY_SQUARE = '-' # class constant, a single character string to represent an empty square
 
     def __init__(self, board_position=None):
         '''
@@ -48,6 +48,7 @@ class Board:
             else:
                 # Couldn't interpret board position input, throw an error
                 raise Exception("Couldn't interpret board position input as 8x8 numpy array of single characters or as FEN board position!")
+
 
     def __str__(self):
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
@@ -91,8 +92,8 @@ class Board:
         return board_string
 
 
-
-    def isValidFENboard(self, board: str) -> bool:
+    @classmethod
+    def isValidFENboard(cls, board: str) -> bool:
         '''
         Checks that a given string is a valid FEN board representation.
 
@@ -109,7 +110,9 @@ class Board:
                 return False
         return True
 
-    def is_FEN(self, possible_FEN: str) -> bool:
+
+    @classmethod
+    def is_FEN(cls, possible_FEN: str) -> bool:
         '''
         Checks if input is a valid complete FEN
         
@@ -121,7 +124,7 @@ class Board:
             return False
         
         boardMaybe, side, castle, enpass, halfmovecounter, turnnum = fen_fields
-        if not self.isValidFENboard(boardMaybe):
+        if not Board.isValidFENboard(boardMaybe):
             return False
         if side not in ['w', 'b']:
             return False
@@ -137,7 +140,37 @@ class Board:
         if int(halfmovecounter) < 0 or int(turnnum) < 0 or int(halfmovecounter) >= 2 * int(turnnum):
             return False
         return True
-      
+
+
+    def to_FEN_board(self):
+        '''Export current board position as FEN board string'''
+        row_strings = []
+        for rank_idx in range(7,-1,-1):
+            currently_counting_empty_squares = False
+            empty_square_count = 0
+            row_string = ''
+            for sq in self.board_array[rank_idx,:]:
+                if sq == Board.EMPTY_SQUARE:
+                    if not currently_counting_empty_squares:
+                        currently_counting_empty_squares = True
+                        empty_square_count = 1
+                    else: 
+                        empty_square_count +=1
+                else:
+                    # non-empty square
+                    if currently_counting_empty_squares:
+                        # Complete the empty square count
+                        currently_counting_empty_squares = False
+                        row_string += '%i' % empty_square_count
+                    # add piece from current square
+                    row_string += sq
+            if currently_counting_empty_squares:
+                row_string += '%i' % empty_square_count
+            row_strings.append(row_string)
+        # Assemble rows into one long string with slashes between rows
+        FEN_board_string = '/'.join(row_strings)
+        return FEN_board_string
+    
   
     @classmethod
     def convert_FEN_to_board_array(cls, FEN):
@@ -197,7 +230,7 @@ def sillyMike():
         print('\r', end='')                     # use '\r' to go back
 
 
-    for i in range(50):                        # for 0 to 100
+    for __ in range(50):                        # for 0 to 100
         compute = random.random()
         print("Computing... " + str(compute), end='')                        # just print and flush
         backline()                              # back to the beginning of line    
