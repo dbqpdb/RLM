@@ -8,7 +8,6 @@ versionNumber = 0.01 # Just getting started, not at all functional
 
 import numpy as np
 import re
-from collections import defaultdict 
 
 # Let's start off with this as a single file and refactor it into multple files when we feel 
 # like this one is getting unwieldy
@@ -138,6 +137,34 @@ class Board:
             # Conversion failed
             rank_idx = None
         return file_idx, rank_idx
+
+
+    def move(self, source_square_name, destination_square_name):
+        '''Moves whatever piece is on the source square to the destination square.
+        Throws an error if the source square is empty. Returns the contents of the 
+        destination square (might be handy for capture processing). Square names 
+        are processed by square_name_to_array_idxs(), so any format that function 
+        can handle is fine for square names.
+        '''
+        moving_piece = self[source_square_name]
+        if moving_piece==Board.EMPTY_SQUARE:
+            raise Exception('You attempted to move an empty square!')
+        destination_occupant = self[destination_square_name]
+        # Move the piece
+        self[source_square_name] = Board.EMPTY_SQUARE # former square becomes empty
+        self[destination_square_name] = moving_piece # new square filled by moving piece
+        return destination_occupant # return the captured piece (or empty square if it was empty)
+
+
+    def list_pieces(self):
+        '''Lists all pieces which are on the board, divided into a list of white pieces
+        and a list of black pieces'''
+        pieces = [piece for piece in self.board_array.ravel() if not (piece==Board.EMPTY_SQUARE)]
+        white_pieces = [piece for piece in pieces if piece==piece.upper()]
+        black_pieces = [piece for piece in pieces if piece==piece.lower()]
+        return white_pieces, black_pieces
+
+
 
 
     def __str__(self):
