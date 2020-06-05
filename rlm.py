@@ -165,8 +165,6 @@ class Board:
         return white_pieces, black_pieces
 
 
-
-
     def __str__(self):
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
         # How about something like this:
