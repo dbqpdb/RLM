@@ -8,9 +8,15 @@ versionNumber = 0.01 # Just getting started, not at all functional
 
 import numpy as np
 import re
+import sys
+from random import *
+import time
+import gzip
+import pandas as pd
 
 # Let's start off with this as a single file and refactor it into multple files when we feel 
 # like this one is getting unwieldy
+# --Okay. :)
 
 class Board:
     '''A class to hold and manipulate representations of the chess board'''
@@ -337,19 +343,19 @@ class Board:
         rankIdx = int(7 - np.floor(squareIdx/board_size[0]))
         return rankIdx, fileIdx
 
-def sillyMike():
-    import random
-    import time   
-
+def sillyDude():
+    dude = choice(['Mike', 'Bryan'])
+    print("Is " + dude + " silly?:")
     def backline():        
-        print('\r', end='')                     # use '\r' to go back
+        print(' ' * messagelen, end='')
+        print('\r', end='')
 
-
-    for __ in range(50):                        # for 0 to 100
-        compute = random.random()
-        print("Computing... " + str(compute), end='')                        # just print and flush
-        backline()                              # back to the beginning of line    
-        time.sleep(random.random()/10)
+    for __ in range(50):
+        compute = random()
+        message = "Computing... " + str(compute)
+        messagelen = len(message)
+        time.sleep(compute/10)
+        print(message, end='')
         backline()
     backline()
     # Put it this way: if silly were a something, and Mike was a something els, he'd be somethinging the first something to some outrageous extent.
@@ -357,33 +363,90 @@ def sillyMike():
     #sillyThing = 
     #verb = 
     #extent = 
-    print("Yes. Quite.                            " if compute else "No. Not at all. Why do you ask?                    ")
+    print("Yes. Quite." if compute else "No. Not at all. Why do you ask?")
+
+
+# Prep the dictionary
+class Lexicon:
+    def __init__(self, lexfile='subtlex.txt.gz'):
+        '''
+        Initialize a Lexicon object for use in the game.
+        '''
+        with gzip.open(lexfile, 'rb') as f:
+            self.lex = pd.read_csv(f, sep='\t')[['Word', 'Dom_PoS_SUBTLEX']]
+        self.lex.columns = ['word', 'pos']
+        self.lex.pos = [str(x).lower() for x in self.lex.pos.tolist()]
+        # Store a list of all PsoS of the dictionary for validation
+        self.lex = {x:self.lex.loc[self.lex.pos == x].word.tolist() for x in set(self.lex.pos)}
+        
+    def squawk_pos(self):
+        '''
+        Report which PsoS are represented in the dictionary
+        '''
+        return {key:len(self.lex[key]) for key in self.lex.keys()}
+
+    def spew(self, pos: str) -> str:
+        '''
+        Spew out a random word of a given part-of-speech
+
+        :param str pos: a part-of-speech labeled in the lexicon
+        :return str bleh: a random word of the given POS
+        '''
+        bleh = choice(self.lex[pos])
+        return bleh
+
+
+class Loudmouth:
+    '''
+    Loudmouth'll be the class that implements commenting methods.
+    '''
+    def __init__(self):
+        self.noggin = Lexicon()
+
+    def propound(self, template: str):
+        '''
+        Propound takes a template of the form
+        "This {noun} is a {adverb} {adjective} {noun}."
+        and inserts random words from the relevant classes.
+        '''
+        fill = [x.strip("{}") for x in re.findall('\{.+?\}', template)]
+        template = re.sub("\{.*?\}", "{}", template)
+        self.noggin.squawk_pos()
+        print(template.format(*[self.noggin.spew(x) for x in fill]))
 
 
 def run_me_if_i_am_the_main_file():
+    
+    # Prepare the loudmouth
+    me = Loudmouth()
+
     # This function is called if you run "python rlm.py"
     print('I am running!!!')
     # Create a board with no inputs
     startingBoard = Board()
     print('Board array generated from no inputs: \n%s'%(str(startingBoard.board_array)))
+    me.propound("{interjection}! I haven't been {adverb} implemented yet. What kind of {noun} do you {verb} me to {verb}? {noun}?!?")
     # Test FEN conversion function
     FEN_board_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
     board_array_from_FEN = Board.convert_FEN_to_board_array(FEN_board_string)
     print('Board array generated from FEN board string "%s": \n%s'%(FEN_board_string, board_array_from_FEN))
+    me.propound("If {noun}s were {noun}s, man, you'd {adverb} {verb} {determiner} {noun}!")
     # Create a board from a different FEN-type string
     FEN_board_string_2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2" # after 1. e4 c5; 2. Nf3 
     otherBoard = Board(FEN_board_string_2)
     print('Board array generated from FEN board string "%s": \n%s'%(FEN_board_string_2, str(otherBoard.board_array)))
+    me.propound("There once was a {noun} named {name} from a {adjective} {noun}. Anyway, {pronoun} {adverb} {verb}s.")
     # Create a board from an existing board array
     board_array_from_FEN[4,4] = 'Q' # add a white queen at e5
     boardFromArray = Board(board_array_from_FEN)
     print('Board array generated from array: \n%s'%(str(boardFromArray.board_array)))
+    me.propound("Don't forget to {adverb} {verb} your {noun} {preposition} {determiner} {adjective} {noun}. Otherwise, you know, your {noun} might {verb}.")
+
     # Print the board object directly
     print('Board object printed directly:')
     print(boardFromArray)
     # Ask and answer critical question
-    print("Is Mike silly?:")
-    sillyMike()
+    sillyDude()
 
 
 def run_him_if_i_am_not_the_main_file():
