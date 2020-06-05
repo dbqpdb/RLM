@@ -22,6 +22,7 @@ class Board:
     '''A class to hold and manipulate representations of the chess board'''
 
     EMPTY_SQUARE = '-' # class constant, a single character string to represent an empty square
+    # In the terminal, the unicode glyphs actually look reversed, so:
 
     def __init__(self, board_position=None):
         '''
@@ -31,6 +32,10 @@ class Board:
         string.
         : param board_position: a board position, specified as ndarray or FEN string
         '''
+        self.pieces = ['P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k']
+        self.glyphs = ['♟︎', '♜', '♞', '♝', '♛', '♚', '♙', '♖', '♘', '♗', '♕', '♔']
+        self.glyphmap = dict(zip(self.pieces, self.glyphs))
+
         print('running init...')
         if board_position is None:
             # default to standard starting position
@@ -212,6 +217,8 @@ class Board:
             else:
                 board_string += lower_edge
         board_string += file_labels
+        for piece, glyph in self.glyphmap.items():
+            board_string = board_string.replace(piece, glyph)
         return board_string
 
 
