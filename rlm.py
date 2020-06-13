@@ -82,6 +82,16 @@ class Board:
         6: 6,
         7: 7,
     }
+    IDX_TO_FILE_DICT = {
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+        6: 'g',
+        7: 'h',
+    }
     def __getitem__(self, square_name):
         ''' Allows indexing into Board objects.  If b is a Board, then b['a3'] should return 
         the piece which is on square a3. This function should handle indexing in pretty much any 
@@ -292,6 +302,21 @@ class Board:
         FEN_board_string = '/'.join(row_strings)
         return FEN_board_string
     
+
+    def find_king_square(self, color):
+        ''' Should return the square of the king of the given color (color should start 
+        with 'w' or 'b', case insensitive, representing white or black). Square is returned as 
+        algebraic string'''
+        color_letter = color[0].lower()
+        if color_letter == 'w':
+            K_str = 'K'
+        elif color_letter == 'b':
+            K_str = 'k'
+        #
+        file_idx_tuple, rank_idx_tuple = np.where(self.board_array == K_str)
+        square_str = Board.IDX_TO_FILE_DICT[file_idx_tuple[0]] + str(rank_idx_tuple[0] + 1)
+        return square_str
+
   
     @classmethod
     def convert_FEN_to_board_array(cls, FEN):
@@ -342,6 +367,425 @@ class Board:
         # The rank index is based on the floor of the square idx / 8 
         rankIdx = int(7 - np.floor(squareIdx/board_size[0]))
         return rankIdx, fileIdx
+
+
+    @classmethod
+    def to_long_algebraic(cls, piece_character, current_file_idx, current_rank_idx, new_file_idx, new_rank_idx, capture_flag=False):
+        ''' Convert a piece character and a set of board indices to a long algebraic move string'''
+        cur_file = cls.IDX_TO_FILE_DICT[current_file_idx]
+        cur_rank = str(current_rank_idx + 1)
+        capture_str = 'x' if capture_flag else ''
+        dest_file = cls.IDX_TO_FILE_DICT[new_file_idx]
+        dest_rank = str(new_rank_idx + 1)
+
+        long_algebraic_move = piece_character + cur_file + cur_rank + capture_str + dest_file + dest_rank
+        return long_algebraic_move
+
+
+class GameController:
+    '''
+    Class to manage game flow. Should handle gathering player info, setting up game,
+    prompting players for moves, calling comment generation routines, orchestrating
+    post-game processes (e.g. saving to PGN).  Game state should be held in a Game 
+    object, board state in a Board object.  
+    '''
+class Game:
+    '''Class to hold a game state.  Game state includes everything in an FEN, plus
+    a unique GameID.  Probably makes sense for it to keep track of everything that
+    would go into a PGN too (player names, game history, location, event, site)
+    '''
+    def __init__(self, ep_square = None):
+        self.ep_square = ep_square
+        self.castling_state = 'kqKQ'
+        self.side_to_move = 'w'
+        self.white_pieces = []
+        self.black_pieces = []
+
+    def get_castling_state(self, is_white):
+        '''Returns a tuple of two booleans indicating whether the game state permits
+        castling kingside and queenside. If is_white is true, then the reported 
+        permissions are for white, otherwise they are for black'''
+        if is_white:
+            kingside_allowed = True if 'K' in self.castling_state else False
+            queenside_allowed = True if 'Q' in self.castling_state else False
+        else:
+            kingside_allowed = True if 'k' in self.castling_state else False
+            queenside_allowed = True if 'q' in self.castling_state else False
+        return kingside_allowed, queenside_allowed
+
+    def get_moves_for(self, other_side=False, allow_own_king_checked=False):
+        '''This function should get all possible moves in the current game
+        state.  If other_side is False (default) then moves are generated for 
+        the color which is next to move. If other_side is True, then moves are
+        generated for the color which is not next to move. If allow_own_king_checked
+        is False (default), then moves which would lead to the moving side's king
+        being in check are pruned as illegal.  If allow_own_king_checked is True,
+        then the full move list is returned without being pruned in this way.  This
+        option is necessary because the procedure for figuring out if one side is 
+        in check relies on generating moves for the other side ignoring whether such
+        moves would leave themselves in check.  For example, a pinned bishop can 
+        still give check, but a pinned bishop's moves will all be pruned if we 
+        cut out those leading to check. 
+        
+        Note that move lists generated with allow_own_king_checked will omit 
+        castling moves even if they are legal.  This is done for two reasons. First,
+        they can't be capture moves, so they aren't relevant for determining whether
+        the other side is currently in check. Second, they're costly to calculate and 
+        involve checking for check, so they would needlessly complicate things. Since
+        they're complicated and unnecessary, they are left out. 
+        '''
+        moves = []
+        # Loop over the pieces which are of the color to move, generating moves for each one
+        if (self.side_to_move =='w' and not other_side) or (self.side_to_move=='b' and other_side):
+            pieces_to_move = self.white_pieces
+        else:
+            pieces_to_move = self.black_pieces
+        
+        for p in pieces_to_move:
+            moves.extend(p.get_moves(allow_own_king_checked=allow_own_king_checked))
+        return moves
+
+class MovesGenerator:
+    ''' Class to generate a list of possible moves, given a game state
+    [I don't know if there's really any reason to make this a class. It seemed like
+    a separate set of functionalities than a board or game or player or piece, but on
+    the other hand doesn't really seem like it needs to store any data at all, possibly 
+    just house methods, which is maybe an OK thing for a class to do?]
+    '''
+
+class Piece:
+    '''Superclass of all chess pieces. All pieces have a name, a one-character
+    abbreviation, a color, a current square they are on, and a board they are on
+    '''
+    def __init__(self, name, char, color, current_square, game): 
+        self.name = name
+        self.char = char
+        self.color = color
+        self.current_square = current_square
+        self.game = game
+    
+    def get_moves(self, allow_own_king_checked=False):
+        # Method to return list of legal moves. Subclasses must provide implementation.
+        # Should return a list of moves.  If allow_own_king_checked is False, these
+        # moves are pruned to remove moves that would leave the board in a state where the 
+        # same-color king is checked by the enemy. The allow_own_king_checked flag will be 
+        # set to True when implementing the is_in_check function, because in that case we
+        # need to account for possible moves even if they would leave their king in check.
+        # For example, one King cannot move into check by an enemy Bishop, even if that
+        # enemy Bishop is pinned to their own King.
+        pass
+
+    def is_white(self):
+        if self.color[0].lower() == 'w':
+            return True
+        else:
+            return False
+
+    def is_black(self):
+        return not self.is_white()
+
+    def is_enemy(self, other):
+        # Return true if other represents the opposite color piece as self. "other" should be a 
+        # one-character string representing the name of a piece. If a string like '-' is passed in
+        # which is unchanged by uppercasing or lowercasing, is_enemy returns False
+        other_is_white = other==other.upper() and other != other.lower()
+        other_is_black = other==other.lower() and other != other.upper()
+        return (self.is_white() and other_is_black) or (self.is_black() and other_is_white)
+
+    def is_friend(self, other):
+        # Return true if other represents the same color piece as self. "other" should be a 
+        # one-character string representing the name of a piece. If a string like '-' is passed in
+        # which is unchanged by uppercasing or lowercasing, is_friend returns False
+        other_is_white = other==other.upper() and other != other.lower()
+        other_is_black = other==other.lower() and other != other.upper()
+        return (self.is_white() and other_is_white) or (self.is_black() and other_is_black)
+        
+
+class KQRBN_Piece (Piece):
+    '''Superclass of all non-pawn pieces. These pieces can be characterized by 
+    a move pattern plus a flag indicating whether they can repeat a move. Class 
+    provides implementations of get_single_move() and get_ray_moves()'''
+    def __init__(self, single_moves, ray_move_flag):
+        self.single_moves = single_moves
+        self.ray_move_flag = ray_move_flag
+
+    def get_single_move(self, dx, dy):
+        '''Given an offset from the current piece position, this function will return None if the
+        move represented by that offset would take the piece off the board or onto a friendly piece.
+        If the offset would take the piece onto an empty square or an enemy piece, a long form 
+        algebraic string of the move will be returned (including piece name, source square, optional
+        capture 'x', and destination square). 
+        Returned move format is changing to 
+        move = (piece character, (startingFileIdx, startingRankIdx), 
+                (destFileIdx, destRankIdx), 
+                capturedPiece or None, castlingBoolean, promotionPiece or None,
+               )
+        '''
+        board = self.game.board
+        current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square) # TODO consider whether this should be stored or input rather than looked up repeatedly
+        new_file_idx = current_file_idx + dx
+        new_rank_idx = current_file_idx + dy
+        castling_boolean = False # castling is not handled by get_single_move(), so this is always false in moves generated by it
+        promotion_piece = None # pawn promotion is not handled by get_single_move(), so this is always None in moves generated by it
+        destination_occupant = board[new_file_idx, new_rank_idx]
+        if destination_occupant is None or self.is_friend(destination_occupant):
+            # Destination is off the board or is a friendly piece, move is invalid
+            return None
+        elif destination_occupant is Board.EMPTY_SQUARE:
+            # Destination is currently empty, move is provisionally valid
+            captured_piece = None
+            candidate_move = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece) 
+            return candidate_move
+        elif self.is_enemy(destination_occupant):
+            # Destination is occupied by an enemy piece, capture is provisionally valid
+            captured_piece = destination_occupant
+            candidate_move = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece) 
+            return candidate_move
+        else:
+            raise Exception('Destination occupant appears to be none of the expected outcomes: enemy, friend, empty, or off board!')
+        
+    def get_ray_moves(self, dx, dy):
+        ''' Return list of potentially valid moves obtainable by repeating the single move represented by dx dy over and over
+        until hitting a friendly piece, an enemy piece, or falling off the board edge'''
+        candidate_moves = []
+        iteration_counter = 1
+        max_ray_length = 10
+        for iteration_counter in range(1, max_ray_length+1):
+            candidate_move = self.get_single_move(iteration_counter*dx, iteration_counter*dy)
+            if candidate_moves is None:
+                # offset takes you into a friendly piece or off the board, no more valid moves are possible
+                return candidate_moves
+            elif self.is_capture(candidate_move):
+                # possible move is a capture; this one should be included, but we shouldn't look for any further than this
+                candidate_moves.append(candidate_move)
+                return candidate_moves
+            else:
+                # candidate move is onto empty square, OK to keep looking further along the ray
+                candidate_moves.append(candidate_move)
+        raise Exception("The ray should have terminated by now... but it hasn't")
+
+
+    def is_capture(self, move_string):
+        # Convenience method for checking if a move string looks like a capture
+        return True if 'x' in move_string else False
+
+        
+    def get_moves(self, allow_own_king_checked=False):
+        '''This function is responsible for generating all possibly legal moves of the piece, 
+        optionally filtered to remove moves that result in board positions which leave or put
+        their own king in check. 
+        "Possibly legal" because some moves will depend on the game state and not just on board
+        state. '''
+        provisional_moves = []
+        board = self.game.board
+        
+        if not self.ray_move_flag:
+            # No ray moves, only single moves
+            for dx,dy  in self.single_moves:
+                candidate_move = self.get_single_move(dx, dy)
+                if candidate_move is not None:
+                    provisional_moves.append(candidate_move)                     
+        else:
+            # Ray moves are allowed
+            for dx,dy in self.single_moves:
+                candidate_moves = self.get_ray_moves(dx, dy)
+                provisional_moves.extend(candidate_moves)
+
+        if not allow_own_king_checked:
+            # Filter out moves which put or leave our King in check
+            king_square = board.find_king_square(self.color)
+            our_king = King(self.color, king_square, self.game)
+            moves = [move for move in provisional_moves if not our_king.is_in_check()]
+        else:
+            moves = provisional_moves
+
+        # How to handle special rules about King moves?  Could the King call this get_moves, then implement it's 
+        # own additional code to handle castling-related move generation and move pruning?
+
+        # Return the final list of moves
+        return moves
+
+
+class King (KQRBN_Piece):
+    def __init__(self, color, square, game):
+        char = 'K' if self.is_white() else 'k'
+        Piece.__init__(self, name='King', char=char, color=color, current_square=square, game=game)
+        single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
+        single_moves.remove([0,0])
+        ray_move_flag = False
+        KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
+
+    def get_moves(self, allow_own_king_checked=False):
+        # The king also needs it's own implementation of get_moves, because castling cannot be handled by single or ray moves
+        # Start by gathering normal moves using superclass
+        provisional_moves = KQRBN_Piece.get_moves(self)
+        # Consider adding castling related moves
+        # In order for castling to be legal:
+        # * The game castling state has to allow it (i.e. contain "K" to permit white king-sided castling)
+        # * The King and Rook must be on starting squares with only empty squares between
+        # * The King must not be in check after castling is complete
+        # * The square the King moves through must not be attacked
+        # * The King must not be in check now
+
+        # Skip consideration of castling if doing the abbreviated move generation (i.e. if allow_own_king_checked is True)
+        if not allow_own_king_checked:
+            kingside_allowed_by_state, queenside_allowed_by_state = self.game.get_castling_state(self.color) 
+            kingside_allowed_by_position, queenside_allowed_by_position = self.get_castling_allowed_by_position() 
+            kingside_allowed_by_check, queenside_allowed_by_check = self.get_castling_allowed_by_check() # TODO: write this function
+
+            kingside_allowed = kingside_allowed_by_state and kingside_allowed_by_position and kingside_allowed_by_check
+            queenside_allowed = queenside_allowed_by_state and queenside_allowed_by_position and queenside_allowed_by_check
+            if kingside_allowed:
+                provisional_moves.append(self.get_kingside_castle_move())
+            if queenside_allowed:
+                provisional_moves.append(self.get_queenside_castle_move())
+
+
+    def get_kingside_castle_move(self):
+        # needs to be updated if move format changes!
+        board = self.game.board
+        start = board.square_name_to_array_idxs(self.current_square)
+        captured = None
+        castling = True
+        promotion_piece = None
+        if self.is_white():
+            dest = board.square_name_to_array_idxs('g1')
+        else:
+            dest = board.square_name_to_array_idxs('g8')
+        move = (self.char, start, dest, captured, castling, promotion_piece)
+        return move
+
+    def get_queenside_castle_move(self):
+        # needs to be updated if move format changes!
+        board = self.game.board
+        start = board.square_name_to_array_idxs(self.current_square)
+        captured = None
+        castling = True
+        promotion_piece = None
+        if self.is_white():
+            dest = board.square_name_to_array_idxs('c1')
+        else:
+            dest = board.square_name_to_array_idxs('c8')
+        move = (self.char, start, dest, captured, castling, promotion_piece)
+        return move
+
+    
+    def get_castling_allowed_by_position(self):
+        # Castling is allowed by the position if the king and rook are on starting squares and 
+        # intervening squares are empty
+        board = self.game.board
+        if self.is_white():
+            if board['e1']=='K':
+                # Kingside
+                if board['f1']==Board.EMPTY_SQUARE and board['g1']==Board.EMPTY_SQUARE and board['h1']=='R':
+                    kingside_allowed = True
+                else:
+                    kingside_allowed = False
+                if board['d1']==Board.EMPTY_SQUARE and board['c1']==Board.EMPTY_SQUARE and board['b1']==Board.EMPTY_SQUARE and board['a1']=='R':
+                    queenside_allowed = True
+                else:
+                    queenside_allowed = False
+        else: # black
+            if board['e8']=='k':
+                # Kingside
+                if board['f8']==Board.EMPTY_SQUARE and board['g8']==Board.EMPTY_SQUARE and board['h8']=='r':
+                    kingside_allowed = True
+                else:
+                    kingside_allowed = False
+                if board['d8']==Board.EMPTY_SQUARE and board['c8']==Board.EMPTY_SQUARE and board['b8']==Board.EMPTY_SQUARE and board['a8']=='r':
+                    queenside_allowed = True
+                else:
+                    queenside_allowed = False
+        return kingside_allowed, queenside_allowed
+       
+    def get_castling_allowed_by_check(self):
+        # This function must return two boolean values indicating whether the king would be in check 
+        # after castling or would be moving through check while castling, or is currently in check.
+        board = self.game.board
+
+        current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
+
+        other_side_moves = self.game.get_moves_for(is_white=not self.is_white(), allow_own_king_checked=True)
+        other_side_dest_squares = [board.square_name_to_array_idxs(move[-2:]) for move in other_side_moves] # this will fail to make sense for castling (irrelevant) and pawn promotion (TODO: needs to be handled)
+        
+        if (current_file_idx, current_rank_idx) in other_side_dest_squares:
+            # Currently in check, castling is not allowed to either side
+            kingside_allowed, queenside_allowed = False, False
+        else:
+            # Consider Kingside
+            if ((current_file_idx+1, current_rank_idx) in other_side_dest_squares()) or ((current_file_idx+2, current_rank_idx) in other_side_dest_squares()):
+                kingside_allowed = False # either moving into check or through check
+            else:
+                kingside_allowed = True # not in check, moving through check, or ending in check
+            # Consider Queenside
+            if ((current_file_idx-1, current_rank_idx) in other_side_dest_squares()) or ((current_file_idx-2, current_rank_idx) in other_side_dest_squares()):
+                queenside_allowed = False # either moving into check or through check
+            else:
+                queenside_allowed = True # not in check, moving through check, or ending in check
+        return kingside_allowed, queenside_allowed
+
+
+
+    def is_in_check(self, board=None):
+        '''Should return a true if this king is in check, false otherwise.
+        In order to do this, we need to know if any of the other side's pieces
+        could capture this king in one move, regardless of whether that move would 
+        expose their own king to check.  One way to do this would be to generate 
+        all possible moves for the other side, unfiltered by check status.  Another
+        way would be to start from this king, and look out to see whether any pieces
+        are in a position to attack it. Both approaches are kind of messy.  In general, 
+        we do need to filter out moves which would expose our own king to check, '''
+        other_side_moves = self.game.get_moves_for(is_white=not self.is_white(), allow_own_king_checked=True)
+        other_side_dest_squares = [move[2] for move in other_side_moves] # this will fail to make sense for castling (irrelevant) and pawn promotion (TODO: needs to be handled)
+        current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
+        if (current_file_idx, current_rank_idx) in other_side_dest_squares:
+            in_check = True
+        else: 
+            in_check = False
+        return in_check
+
+
+class Queen (KQRBN_Piece):
+    def __init__(self, color, square, game):
+        char = 'Q' if self.is_white() else 'q'
+        Piece.__init__(self, name='Queen', char=char, color=color, current_square=square, game=game)
+        single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
+        single_moves.remove([0,0])
+        ray_move_flag = True
+        KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
+class Bishop (KQRBN_Piece):
+    def __init__(self, color, square, game):
+        char = 'B' if self.is_white() else 'b'
+        Piece.__init__(self, name='Bishop', char=char, color=color, current_square=square, game=game)
+        single_moves = [ [dx, dy] for dx in [-1,1] for dy in [-1,1] ]
+        ray_move_flag = True
+        KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
+class Knight (KQRBN_Piece):
+    def __init__(self, color, square, game):
+        char = 'N' if self.is_white() else 'n'
+        Piece.__init__(self, name='Knight', char=char, color=color, current_square=square, game=game)
+        single_moves = [[-1,  2], 
+                        [ 1,  2],
+                        [ 2,  1], 
+                        [ 2, -1], 
+                        [ 1, -2], 
+                        [-1, -2], 
+                        [-2, -1], 
+                        [-2, 1]]
+        ray_move_flag = False
+        KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
+class Pawn (Piece):
+    '''Class encapulating pawn behaviors'''
+    def __init__(self, color, square, game):
+        char = 'P' if self.is_white() else 'p'
+        self.game = game # pawns unlike other pieces need access to the game state (for e.p. square only), not just the board
+        board = game.board
+        Piece.__init__(self, name='Pawn', char=char, color=color, current_square=square, game=game)
+    
+    def get_moves(self):
+        ep_square = self.game.ep_square
+
+
 
 def sillyDude():
     dude = choice(['Mike', 'Bryan'])
