@@ -23,16 +23,19 @@ class Board:
 
     EMPTY_SQUARE = '-' # class constant, a single character string to represent an empty square
 
-    def __init__(self, board_position=None):
+    def __init__(self, board_position=None, piece_list=None):
         '''
         Constructor for Board class.  Optional board_position input allows construction
         from a given position.  board_position can be supplied as a numpy array of single 
         characters (which is what Board uses internally, or as an FEN-style board position
-        string.
+        string. Alternatively, a list of Piece objects can be supplied, and the board
+        constructed by placing each piece based on its 'current_square' property
         : param board_position: a board position, specified as ndarray or FEN string
+        : param piece_list: a list of Piece objects to place on an empty board
         '''
         print('running init...')
-        if board_position is None:
+        assert not (board_position is not None and piece_list is not None), 'Only one of board_position and piece_list can be specified when initializing a Board object; you specified both'
+        if board_position is None and piece_list is None:
             # default to standard starting position
             b = np.array([Board.EMPTY_SQUARE]*64).reshape((8,8))
             b[0,:] = [piece for piece in ['R','N','B','Q','K','B','N','R']] # RNBQKBNR
@@ -40,8 +43,8 @@ class Board:
             b[6,:] = ['p']*8
             b[7,:] = [piece for piece in ['r','n','b','q','k','b','n','r']]
             self.board_array = b
-        else: 
-            # a board_position was supplied check if it's valid 
+        elif board_position is not None:
+            # a board_position was supplied, check if it's valid 
             if isinstance(board_position, np.ndarray):
                 if board_position.shape==(8,8) and board_position.dtype==np.dtype('<U1'): 
                     # right shape and data type
@@ -54,6 +57,12 @@ class Board:
             else:
                 # Couldn't interpret board position input, throw an error
                 raise Exception("Couldn't interpret board position input as 8x8 numpy array of single characters or as FEN board position!")
+        elif piece_list is not None:
+            # Make board from pieces
+            b = np.array([Board.EMPTY_SQUARE]*64).reshape((8,8))
+            for piece in piece_list:
+                b[piece.current_square] = piece.char 
+            self.board_array = b
 
     
     FILE_TO_IDX_DICT = {
@@ -396,7 +405,7 @@ class Game:
     '''
     def __init__(self, ep_square = None):
         self.ep_square = ep_square
-        self.castling_state = 'kqKQ'
+        self.castling_state = 'kqKQ' # TODO: currently just a placeholder which allows all castling options
         self.side_to_move = 'w'
         self.white_pieces = []
         self.black_pieces = []
@@ -475,8 +484,10 @@ class Piece:
         # enemy Bishop is pinned to their own King.
         pass
 
-    def is_white(self):
-        if self.color[0].lower() == 'w':
+    def is_white(self, color):
+        if color is None:
+            color = self.color  
+        if color[0].lower() == 'w':
             return True
         else:
             return False
@@ -608,7 +619,7 @@ class KQRBN_Piece (Piece):
 
 class King (KQRBN_Piece):
     def __init__(self, color, square, game):
-        char = 'K' if self.is_white() else 'k'
+        char = 'K' if self.is_white(color) else 'k'
         Piece.__init__(self, name='King', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
         single_moves.remove([0,0])
@@ -706,7 +717,7 @@ class King (KQRBN_Piece):
         current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
 
         other_side_moves = self.game.get_moves_for(is_white=not self.is_white(), allow_own_king_checked=True)
-        other_side_dest_squares = [board.square_name_to_array_idxs(move[-2:]) for move in other_side_moves] # this will fail to make sense for castling (irrelevant) and pawn promotion (TODO: needs to be handled)
+        other_side_dest_squares = [move[2] for move in other_side_moves] 
         
         if (current_file_idx, current_rank_idx) in other_side_dest_squares:
             # Currently in check, castling is not allowed to either side
@@ -736,7 +747,7 @@ class King (KQRBN_Piece):
         are in a position to attack it. Both approaches are kind of messy.  In general, 
         we do need to filter out moves which would expose our own king to check, '''
         other_side_moves = self.game.get_moves_for(is_white=not self.is_white(), allow_own_king_checked=True)
-        other_side_dest_squares = [move[2] for move in other_side_moves] # this will fail to make sense for castling (irrelevant) and pawn promotion (TODO: needs to be handled)
+        other_side_dest_squares = [move[2] for move in other_side_moves]
         current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
         if (current_file_idx, current_rank_idx) in other_side_dest_squares:
             in_check = True
