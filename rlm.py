@@ -62,7 +62,7 @@ class Board:
             b = np.array([Board.EMPTY_SQUARE]*64).reshape((8,8))
             for piece in piece_list:
                 file_idx, rank_idx = self.square_name_to_array_idxs(piece.current_square)
-                b[rank_idx, file_idx] = piece.char 
+                b[rank_idx, file_idx] = piece.char  # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
             self.board_array = b
 
     
@@ -122,7 +122,7 @@ class Board:
         if rank_idx is None or file_idx is None:
             return None
         else:
-            return self.board_array[rank_idx, file_idx]
+            return self.board_array[rank_idx, file_idx] # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
         
     VALID_BOARD_SQUARE_CONTENTS_PATTERN = re.compile('(^[pnbrkqPNBRKQ]$)|(^%s$)' % EMPTY_SQUARE)    
 
@@ -137,7 +137,7 @@ class Board:
         if rank_idx is None or file_idx is None:
             Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
         else:
-            self.board_array[rank_idx, file_idx] = new_value
+            self.board_array[rank_idx, file_idx] = new_value # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
 
     def square_name_to_array_idxs(self, square_name):
         '''This function should handle interpreting square names in pretty much any 
@@ -184,7 +184,7 @@ class Board:
 
     def list_pieces(self):
         '''Lists all pieces which are on the board, divided into a list of white pieces
-        and a list of black pieces'''
+        and a list of black pieces. (Note that these are single characters, not Piece objects)'''
         pieces = [piece for piece in self.board_array.ravel() if not (piece==Board.EMPTY_SQUARE)]
         white_pieces = [piece for piece in pieces if piece==piece.upper()]
         black_pieces = [piece for piece in pieces if piece==piece.lower()]
@@ -540,7 +540,9 @@ class Piece:
         '''Create a Piece object of the appropriate subclass given a single character
         representation and a current square'''
         # color square game
-        assert piece_char in 'KQRBNPkqrbnp', 'Piece character must be one of "KQRBNPkqrbnp"!'
+        assert piece_char in 'KQRBNPkqrbnp'+Board.EMPTY_SQUARE, 'Piece character must be one of "KQRBNPkqrbnp" (or empty square character)!'
+        if piece_char==Board.EMPTY_SQUARE:
+            return None #don't generate a Piece object
         if piece_char.upper()==piece_char:
             color = 'w'
         else:
@@ -593,7 +595,7 @@ class KQRBN_Piece (Piece):
         if destination_occupant is None or self.is_friend(destination_occupant):
             # Destination is off the board or is a friendly piece, move is invalid
             return None
-        elif destination_occupant is Board.EMPTY_SQUARE:
+        elif destination_occupant == Board.EMPTY_SQUARE:
             # Destination is currently empty, move is provisionally valid
             captured_piece = None
             candidate_move = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece) 
@@ -669,7 +671,7 @@ class KQRBN_Piece (Piece):
 
 
 class King (KQRBN_Piece):
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'K' if self.is_white(color) else 'k'
         Piece.__init__(self, name='King', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
@@ -797,7 +799,7 @@ class King (KQRBN_Piece):
         way would be to start from this king, and look out to see whether any pieces
         are in a position to attack it. Both approaches are kind of messy.  In general, 
         we do need to filter out moves which would expose our own king to check, '''
-        other_side_moves = self.game.get_moves_for(is_white=not self.is_white(), allow_own_king_checked=True)
+        other_side_moves = self.game.get_moves_for(other_side=True, allow_own_king_checked=True)
         other_side_dest_squares = [move[2] for move in other_side_moves]
         current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
         if (current_file_idx, current_rank_idx) in other_side_dest_squares:
@@ -963,7 +965,15 @@ def run_me_if_i_am_the_main_file():
     print('Board object printed directly:')
     print(boardFromArray)
     # Ask and answer critical question
-    sillyDude()
+    #sillyDude()
+
+    print('Testing move generation and Piece objects...')
+    g = Game()
+    K = King('w', 'e1')
+    k = King('b', 'e8')
+    b = Board(piece_list=[K, k])
+    g.set_board(b)
+    g.get_moves_for()
 
 
 def run_him_if_i_am_not_the_main_file():
