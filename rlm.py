@@ -61,7 +61,8 @@ class Board:
             # Make board from pieces
             b = np.array([Board.EMPTY_SQUARE]*64).reshape((8,8))
             for piece in piece_list:
-                b[piece.current_square] = piece.char 
+                file_idx, rank_idx = self.square_name_to_array_idxs(piece.current_square)
+                b[rank_idx, file_idx] = piece.char 
             self.board_array = b
 
     
@@ -409,6 +410,29 @@ class Game:
         self.side_to_move = 'w'
         self.white_pieces = []
         self.black_pieces = []
+        self.board = None # This needs to be initialized before we can really play a game, but let's start with a placeholder which indicates it's not initialized
+
+    def set_board(self, board):
+        self.board = board
+        self.initialize_pieces_from_board(board)
+
+    def initialize_pieces_from_board(self, board):
+        '''Generate Piece objects from the given Board object and assign to white and black piece lists'''
+        white_pieces = []
+        black_pieces = []
+        for rank_idx in range(8):
+            for file_idx in range(8):
+                sq = (file_idx, rank_idx)
+                piece_char = board[sq]
+                piece = Piece.piece_from_char_and_square(piece_char, sq, self)
+                if piece is not None:
+                    if piece.is_white():
+                        white_pieces.append(piece)
+                    else:
+                        black_pieces.append(piece)
+        self.white_pieces = white_pieces
+        self.black_pieces = black_pieces
+
 
     def get_castling_state(self, is_white):
         '''Returns a tuple of two booleans indicating whether the game state permits
@@ -484,7 +508,7 @@ class Piece:
         # enemy Bishop is pinned to their own King.
         pass
 
-    def is_white(self, color):
+    def is_white(self, color=None):
         if color is None:
             color = self.color  
         if color[0].lower() == 'w':
@@ -510,6 +534,33 @@ class Piece:
         other_is_white = other==other.upper() and other != other.lower()
         other_is_black = other==other.lower() and other != other.upper()
         return (self.is_white() and other_is_white) or (self.is_black() and other_is_black)
+
+    @classmethod
+    def piece_from_char_and_square(cls, piece_char, square, game):
+        '''Create a Piece object of the appropriate subclass given a single character
+        representation and a current square'''
+        # color square game
+        assert piece_char in 'KQRBNPkqrbnp', 'Piece character must be one of "KQRBNPkqrbnp"!'
+        if piece_char.upper()==piece_char:
+            color = 'w'
+        else:
+            color = 'b'
+        upper_piece_char = piece_char.upper()
+        if upper_piece_char=='K':
+            piece = King(color, square, game)
+        elif upper_piece_char=='Q':
+            piece =  Queen(color, square, game)
+        elif upper_piece_char=='R':
+            piece = Rook(color, square, game)
+        elif upper_piece_char=='B':
+            piece = Bishop(color, square, game)
+        elif upper_piece_char=='N':
+            piece = Knight(color, square, game)
+        elif upper_piece_char=='P':
+            piece = Pawn(color, square, game)
+        return piece
+        
+
         
 
 class KQRBN_Piece (Piece):
@@ -758,22 +809,33 @@ class King (KQRBN_Piece):
 
 class Queen (KQRBN_Piece):
     def __init__(self, color, square, game):
-        char = 'Q' if self.is_white() else 'q'
+        char = 'Q' if self.is_white(color) else 'q'
         Piece.__init__(self, name='Queen', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
         single_moves.remove([0,0])
         ray_move_flag = True
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
+
+class Rook (KQRBN_Piece):
+    def __init__(self, color, square, game):
+        char = 'R' if self.is_white(color) else 'r'
+        Piece.__init__(self, name='Rook', char=char, color=color, current_square=square, game=game)
+        single_moves = [ [ 1,  0],
+                         [-1,  0],
+                         [ 0,  1],
+                         [ 0, -1] ]
+        ray_move_flag = True
+        KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 class Bishop (KQRBN_Piece):
     def __init__(self, color, square, game):
-        char = 'B' if self.is_white() else 'b'
+        char = 'B' if self.is_white(color) else 'b'
         Piece.__init__(self, name='Bishop', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx, dy] for dx in [-1,1] for dy in [-1,1] ]
         ray_move_flag = True
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 class Knight (KQRBN_Piece):
     def __init__(self, color, square, game):
-        char = 'N' if self.is_white() else 'n'
+        char = 'N' if self.is_white(color) else 'n'
         Piece.__init__(self, name='Knight', char=char, color=color, current_square=square, game=game)
         single_moves = [[-1,  2], 
                         [ 1,  2],
@@ -788,7 +850,7 @@ class Knight (KQRBN_Piece):
 class Pawn (Piece):
     '''Class encapulating pawn behaviors'''
     def __init__(self, color, square, game):
-        char = 'P' if self.is_white() else 'p'
+        char = 'P' if self.is_white(color) else 'p'
         self.game = game # pawns unlike other pieces need access to the game state (for e.p. square only), not just the board
         board = game.board
         Piece.__init__(self, name='Pawn', char=char, color=color, current_square=square, game=game)
