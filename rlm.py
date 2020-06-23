@@ -4,7 +4,7 @@
 # The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing 
 #
 # 
-versionNumber = 0.01 # Just getting started, not at all functional
+versionNumber = 0.20 # legal move generation may be working!
 
 import numpy as np
 import re
@@ -33,7 +33,7 @@ class Board:
         : param board_position: a board position, specified as ndarray or FEN string
         : param piece_list: a list of Piece objects to place on an empty board
         '''
-        print('running init...')
+        #print('running init...')
         assert not (board_position is not None and piece_list is not None), 'Only one of board_position and piece_list can be specified when initializing a Board object; you specified both'
         if board_position is None and piece_list is None:
             # default to standard starting position
@@ -169,12 +169,18 @@ class Board:
         return file_idx, rank_idx
 
 
+    def copy(self):
+        '''Return a copy of the existing board'''
+        board_copy = Board(board_position=self.board_array )
+        return board_copy
+
     def move(self, source_square_name, destination_square_name):
         '''Moves whatever piece is on the source square to the destination square.
         Throws an error if the source square is empty. Returns the contents of the 
         destination square (might be handy for capture processing). Square names 
         are processed by square_name_to_array_idxs(), so any format that function 
         can handle is fine for square names.
+        NOTE that this currently does not update any Piece objects, only the board representation!!
         '''
         moving_piece = self[source_square_name]
         if moving_piece==Board.EMPTY_SQUARE:
@@ -327,7 +333,7 @@ class Board:
         elif color_letter == 'b':
             K_str = 'k'
         #
-        file_idx_tuple, rank_idx_tuple = np.where(self.board_array == K_str)
+        rank_idx_tuple, file_idx_tuple = np.where(self.board_array == K_str)
         square_str = Board.IDX_TO_FILE_DICT[file_idx_tuple[0]] + str(rank_idx_tuple[0] + 1)
         return square_str
 
@@ -396,6 +402,121 @@ class Board:
         return long_algebraic_move
 
 
+class Move:
+    '''Should handle having an internal representation of moves and converting to various output
+    representations 
+    '''
+    def __init__(self, move_tuple):
+        ''' Moves are represented as a 5-part tuple, and we need all of them specified at creation 
+        (i.e. none are optional)
+        '''
+        # Unpack
+        char, starting_square, destination_square, captured_piece, isCastlingFlag, promotion, ep = move_tuple
+        self.single_char = char
+        self.starting_square = starting_square
+        self.destination_square = destination_square
+        self.captured_piece = captured_piece
+        self.is_castling = isCastlingFlag
+        self.promotion_piece = promotion
+        self.is_en_passant = ep
+
+    def is_capture(self):
+        return not (self.captured_piece is None)
+
+    def is_promotion(self):
+        return not (self.promotion_piece is None)
+
+    def to_tuple(self):
+        # For debugging, this is a way to return the move in the internal format which is used in initialization
+        move_tuple = (self.single_char, self.starting_square, self.destination_square, self.captured_piece, self.is_castling, self.promotion_piece, self.is_en_passant)
+        return move_tuple
+
+    def to_long_algebraic(self, use_figurine=False, note_ep=False):
+        '''Long algebraic includes starting and destination square'''
+        if use_figurine:
+            p = self.PIECE_TO_FIGURINE_DICT[self.single_char]
+        else:
+            p = self.single_char.upper()
+        start_sq = self.square_to_string(self.starting_square)
+        dest_sq = self.square_to_string(self.destination_square)
+        if self.is_castling:
+            # figure out if kingside or queenside
+            if self.destination_square[0]> self.starting_square[0]:
+                move_string = 'O-O' # kingside
+            else:
+                move_string = 'O-O-O' # queenside
+        else:
+            cap_str = '' if self.captured_piece is None else 'x'
+            prom_str = '' if self.promotion_piece is None else '='+self.promotion_piece.upper()
+            move_string = p + start_sq + cap_str + dest_sq + prom_str
+            if self.is_en_passant and note_ep:
+                move_string += 'e.p.' #add notation that this capture is en passant
+        return move_string
+    
+
+    def to_short_algebraic(self, board):
+        # Same as long algebraic except drop destination square
+        # TODO: actually, this should have a lot more logic so it includes elements of starting square if necessary
+        # TODO: hmm, to do this, we actually need the board, because that's what we need to resolve ambiguities
+        p = self.single_char
+        start_sq = self.square_to_string(self.starting_square)
+        dest_sq = self.square_to_string(self.destination_square)
+        if self.is_castling:
+            # figure out if kingside or queenside
+            if self.destination_square[0]> self.starting_square[0]:
+                move_string = 'O-O' # kingside
+            else:
+                move_string = 'O-O-O' # queenside
+        else:
+            cap_str = '' if self.captured_piece is None else 'x'
+            prom_str = '' if self.promotion_piece is None else '='+self.promotion_piece.upper()
+            move_string = p + start_sq + cap_str + dest_sq + prom_str
+        return move_string
+        
+    # Currently, this is duplicated in the Board class, could revisit to explore whether it should be reworked to just appear one place or whether this is more convenient
+    IDX_TO_FILE_DICT =  {
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+        6: 'g',
+        7: 'h',
+    }
+    PIECE_TO_FIGURINE_DICT = { # using named unicode code point
+        'P': '\N{WHITE CHESS PAWN}',
+        'N': '\N{WHITE CHESS KNIGHT}',
+        'B': '\N{WHITE CHESS BISHOP}',
+        'R': '\N{WHITE CHESS ROOK}',
+        'Q': '\N{WHITE CHESS QUEEN}',
+        'K': '\N{WHITE CHESS KING}',
+        'p': '\N{BLACK CHESS PAWN}',
+        'n': '\N{BLACK CHESS KNIGHT}',
+        'b': '\N{BLACK CHESS BISHOP}',
+        'r': '\N{BLACK CHESS ROOK}',
+        'q': '\N{BLACK CHESS QUEEN}',
+        'k': '\N{BLACK CHESS KING}',
+    }
+
+
+    def __str__(self):
+        '''String representation of Move class.'''
+        return self.to_long_algebraic() # just use long algebraic for now
+
+    def __repr__(self):
+        '''String representation for Move objects (this one shows up for example in lists)'''
+        return 'MoveObject.['+str(self)+']'
+
+    @classmethod
+    def square_to_string(cls, sq):
+        '''Convert array indices to string'''
+        # should this handle non-array index square representations also?
+        file_letter = cls.IDX_TO_FILE_DICT[sq[0]]
+        rank_number = '%i'%(sq[1]+1)
+        return file_letter+rank_number
+
+
 class GameController:
     '''
     Class to manage game flow. Should handle gathering player info, setting up game,
@@ -416,9 +537,42 @@ class Game:
         self.black_pieces = []
         self.board = None # This needs to be initialized before we can really play a game, but let's start with a placeholder which indicates it's not initialized
 
+
+    def copy(self):
+        game_copy = Game()
+        game_copy.ep_square = self.ep_square
+        game_copy.castling_state = self.castling_state
+        game_copy.side_to_move = self.side_to_move
+        game_copy.white_pieces = self.white_pieces
+        game_copy.black_pieces = self.black_pieces
+        game_copy.board = self.board.copy() # make a copy of the board, don't reference same board
+        return game_copy
+
+
     def set_board(self, board):
         self.board = board
         self.initialize_pieces_from_board(board)
+
+    def make_move(self, move, change_side_to_move=True):
+        '''Update board and pieces based on move.  change_side_to_move flag determines
+        whether the side_to_move is changed (default) or remains in current state, which
+        is desirable for imagined moves.  
+        NOTE that this update the game's Board object and replaces the Piece objects
+        This may need to be changed in the future if piece objects got more complex and
+        were storing something like a move history, or anything like that. '''
+
+        # Need to update both the moving Piece object, and the Board object
+        self.board.move(move.starting_square, move.destination_square)
+        self.initialize_pieces_from_board(self.board) # this makes the board the master representation
+
+        if change_side_to_move:
+            self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
+  
+    def set_white_to_move(self):
+        self.side_to_move = 'w'
+
+    def set_black_to_move(self):
+        self.side_to_move = 'b'
 
     def initialize_pieces_from_board(self, board):
         '''Generate Piece objects from the given Board object and assign to white and black piece lists'''
@@ -481,14 +635,6 @@ class Game:
         for p in pieces_to_move:
             moves.extend(p.get_moves(allow_own_king_checked=allow_own_king_checked))
         return moves
-
-class MovesGenerator:
-    ''' Class to generate a list of possible moves, given a game state
-    [I don't know if there's really any reason to make this a class. It seemed like
-    a separate set of functionalities than a board or game or player or piece, but on
-    the other hand doesn't really seem like it needs to store any data at all, possibly 
-    just house methods, which is maybe an OK thing for a class to do?]
-    '''
 
 class Piece:
     '''Superclass of all chess pieces. All pieces have a name, a one-character
@@ -595,6 +741,7 @@ class KQRBN_Piece (Piece):
         new_rank_idx = current_rank_idx + dy
         castling_boolean = False # castling is not handled by get_single_move(), so this is always false in moves generated by it
         promotion_piece = None # pawn promotion is not handled by get_single_move(), so this is always None in moves generated by it
+        ep = False
         destination_occupant = board[new_file_idx, new_rank_idx]
         if destination_occupant is None or self.is_friend(destination_occupant):
             # Destination is off the board or is a friendly piece, move is invalid
@@ -602,12 +749,14 @@ class KQRBN_Piece (Piece):
         elif destination_occupant == Board.EMPTY_SQUARE:
             # Destination is currently empty, move is provisionally valid
             captured_piece = None
-            candidate_move = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece) 
+            candidate_move_tuple = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece, ep)
+            candidate_move = Move(candidate_move_tuple)
             return candidate_move
         elif self.is_enemy(destination_occupant):
             # Destination is occupied by an enemy piece, capture is provisionally valid
             captured_piece = destination_occupant
-            candidate_move = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece) 
+            candidate_move_tuple = (self.char, (current_file_idx, current_rank_idx), (new_file_idx, new_rank_idx), captured_piece, castling_boolean, promotion_piece, ep)
+            candidate_move = Move(candidate_move_tuple) 
             return candidate_move
         else:
             raise Exception('Destination occupant appears to be none of the expected outcomes: enemy, friend, empty, or off board!')
@@ -620,10 +769,10 @@ class KQRBN_Piece (Piece):
         max_ray_length = 10
         for iteration_counter in range(1, max_ray_length+1):
             candidate_move = self.get_single_move(iteration_counter*dx, iteration_counter*dy)
-            if candidate_moves is None:
+            if candidate_move is None:
                 # offset takes you into a friendly piece or off the board, no more valid moves are possible
                 return candidate_moves
-            elif self.is_capture(candidate_move):
+            elif candidate_move.is_capture():
                 # possible move is a capture; this one should be included, but we shouldn't look for any further than this
                 candidate_moves.append(candidate_move)
                 return candidate_moves
@@ -631,11 +780,6 @@ class KQRBN_Piece (Piece):
                 # candidate move is onto empty square, OK to keep looking further along the ray
                 candidate_moves.append(candidate_move)
         raise Exception("The ray should have terminated by now... but it hasn't")
-
-
-    def is_capture(self, move_string):
-        # Convenience method for checking if a move string looks like a capture
-        return True if 'x' in move_string else False
 
         
     def get_moves(self, allow_own_king_checked=False):
@@ -663,7 +807,7 @@ class KQRBN_Piece (Piece):
             # Filter out moves which put or leave our King in check
             king_square = board.find_king_square(self.color)
             our_king = King(self.color, king_square, self.game)
-            moves = [move for move in provisional_moves if not our_king.is_in_check()]
+            moves = [move for move in provisional_moves if not our_king.is_in_check_after_move(move)]
         else:
             moves = provisional_moves
 
@@ -717,12 +861,13 @@ class King (KQRBN_Piece):
         captured = None
         castling = True
         promotion_piece = None
+        ep = False
         if self.is_white():
             dest = board.square_name_to_array_idxs('g1')
         else:
             dest = board.square_name_to_array_idxs('g8')
-        move = (self.char, start, dest, captured, castling, promotion_piece)
-        return move
+        move_tuple = (self.char, start, dest, captured, castling, promotion_piece, ep)
+        return Move(move_tuple)
 
     def get_queenside_castle_move(self):
         # needs to be updated if move format changes!
@@ -731,12 +876,13 @@ class King (KQRBN_Piece):
         captured = None
         castling = True
         promotion_piece = None
+        ep = False
         if self.is_white():
             dest = board.square_name_to_array_idxs('c1')
         else:
             dest = board.square_name_to_array_idxs('c8')
-        move = (self.char, start, dest, captured, castling, promotion_piece)
-        return move
+        move_tuple = (self.char, start, dest, captured, castling, promotion_piece, ep)
+        return Move(move_tuple)
 
     
     def get_castling_allowed_by_position(self):
@@ -774,8 +920,8 @@ class King (KQRBN_Piece):
 
         current_file_idx, current_rank_idx = board.square_name_to_array_idxs(self.current_square)
 
-        other_side_moves = self.game.get_moves_for(other_side=False, allow_own_king_checked=True)
-        other_side_dest_squares = [move[2] for move in other_side_moves] 
+        other_side_moves = self.game.get_moves_for(other_side=True, allow_own_king_checked=True)
+        other_side_dest_squares = [move.destination_square for move in other_side_moves] 
         
         if (current_file_idx, current_rank_idx) in other_side_dest_squares:
             # Currently in check, castling is not allowed to either side
@@ -794,6 +940,23 @@ class King (KQRBN_Piece):
         return kingside_allowed, queenside_allowed
 
 
+    def is_in_check_after_move(self, move):
+        '''Imagines making the given move, then evaluates whether in check in the
+        resulting board position. Should be careful to not to alter the game board position
+        permanently, this is an imagined move, not yet an actual move.'''
+        temp_game = self.game.copy() # make a copy of the game to imagine move
+        temp_game.make_move(move, change_side_to_move=False)
+        other_side_moves = temp_game.get_moves_for(other_side=True, allow_own_king_checked=True)
+        other_side_dest_squares = [move.destination_square for move in other_side_moves]
+        for other_side_dest in other_side_dest_squares:
+            if temp_game.board[other_side_dest]==self.char:
+                # The other side has a piece which can move to a board location which is 
+                # occupied by the same character as self.char.  Therefore, the King would be 
+                # in check after the proposed move. 
+                return True
+        # If no other side piece could potentially move to the king's square, then he must not be in check
+        return False
+        
 
     def is_in_check(self):
         '''Should return a true if this king is in check, false otherwise.
@@ -805,7 +968,7 @@ class King (KQRBN_Piece):
         are in a position to attack it. Both approaches are kind of messy.  In general, 
         we do need to filter out moves which would expose our own king to check, '''
         other_side_moves = self.game.get_moves_for(other_side=True, allow_own_king_checked=True)
-        other_side_dest_squares = [move[2] for move in other_side_moves]
+        other_side_dest_squares = [move.destination_square for move in other_side_moves]
         current_file_idx, current_rank_idx = self.game.board.square_name_to_array_idxs(self.current_square)
         if (current_file_idx, current_rank_idx) in other_side_dest_squares:
             in_check = True
@@ -815,7 +978,7 @@ class King (KQRBN_Piece):
 
 
 class Queen (KQRBN_Piece):
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'Q' if self.is_white(color) else 'q'
         Piece.__init__(self, name='Queen', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx,dy] for dx in [-1,0,1]  for dy in [-1,0,1] ]
@@ -824,7 +987,7 @@ class Queen (KQRBN_Piece):
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 
 class Rook (KQRBN_Piece):
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'R' if self.is_white(color) else 'r'
         Piece.__init__(self, name='Rook', char=char, color=color, current_square=square, game=game)
         single_moves = [ [ 1,  0],
@@ -834,14 +997,14 @@ class Rook (KQRBN_Piece):
         ray_move_flag = True
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 class Bishop (KQRBN_Piece):
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'B' if self.is_white(color) else 'b'
         Piece.__init__(self, name='Bishop', char=char, color=color, current_square=square, game=game)
         single_moves = [ [dx, dy] for dx in [-1,1] for dy in [-1,1] ]
         ray_move_flag = True
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 class Knight (KQRBN_Piece):
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'N' if self.is_white(color) else 'n'
         Piece.__init__(self, name='Knight', char=char, color=color, current_square=square, game=game)
         single_moves = [[-1,  2], 
@@ -856,7 +1019,7 @@ class Knight (KQRBN_Piece):
         KQRBN_Piece.__init__(self, single_moves, ray_move_flag)
 class Pawn (Piece):
     '''Class encapulating pawn behaviors'''
-    def __init__(self, color, square, game):
+    def __init__(self, color, square, game=None):
         char = 'P' if self.is_white(color) else 'p'
         self.game = game # pawns unlike other pieces need access to the game state (for e.p. square only), not just the board
         board = game.board
@@ -939,6 +1102,121 @@ class Loudmouth:
         print(template.format(*[self.noggin.spew(x) for x in fill]))
 
 
+class TestRLM:
+    '''This class should contain unit tests for all RLM components'''
+    def __init__(self):
+        # Do we need to do anything on start-up?
+        pass # I don't think so
+
+    def run_all_tests(self):
+        # Run all unit tests.  Whenever you create a new test, add a call to it here
+        try:
+            self.test_board_generation_from_piece_list_1()
+            print('Test: test_board_generation_from_piece_list_1 PASSED')
+        except Exception as e:
+            print('Test: test_board_generation_from_piece_list_1 FAILED with error message: "%s"' % (str(e)))
+        try: 
+            self.test_move_generation_1()
+            print('Test: test_move_generation_1 PASSED')
+        except Exception as e:
+            print('Test: test_move_generation_1 FAILED with error message "%s"' % (str(e)))
+
+        try:
+            self.test_move_generation_2()
+            print('Test: test_move_generation_2 PASSED')
+        except Exception as e:
+            print('Test: test_move_generation_2 FAILED with error message "%s"' % (str(e)))
+        
+
+    def test_board_generation_from_piece_list_1(self):
+        # Very simple test of board generation from list of pieces, just two kings
+        K = King('w', 'e1') # white King on e1
+        k = King('b', 'e8') # black King on e8
+        b = Board(piece_list=[K,k]) # generate board
+        assert b['e1']=='K', "There should be a white king on e1, but there isn't"
+        assert b['e8']=='k', "There should be a black king on e8, but there isn't"
+        assert list(b.board_array.ravel()).count(Board.EMPTY_SQUARE)==62, "There should be 62 empty squares, but there are %i"%(list(b.board_array.ravel()).count(Board.EMPTY_SQUARE))
+        return True
+
+    def test_move_generation_1(self):
+        # Very simple test of basic move generation
+        K = King('w', 'e1') # white King on e1
+        k = King('b', 'e8') # black King on e8
+        b = Board(piece_list=[K,k]) # generate board
+        g = Game()
+        g.set_board(b)
+        g.set_white_to_move()
+        # Test white
+        white_moves = g.get_moves_for()
+        white_move_strs = [move.to_long_algebraic() for move in white_moves]
+        assert len(white_moves)==5, "There should be 5 possible white moves from this position, but there are %i"%(len(white_moves))
+        expected_moves = ['Ke1e2', 'Ke1d1', 'Ke1d2', 'Ke1f2', 'Ke1f1']
+        for move in white_move_strs:
+            assert move in expected_moves, "Move '%s' was produced but not expected!"%(move)
+        # Test black
+        g.set_black_to_move()
+        black_moves = g.get_moves_for()
+        black_move_strs = [move.to_long_algebraic() for move in black_moves]
+        expected_moves = ['Ke8e7', 'Ke8d8', 'Ke8d7', 'Ke8f7', 'Ke8f8']
+        for move in black_move_strs:
+            assert move in expected_moves, "Move '%s' was produced but not expected!"%(move)
+        return True
+
+    def test_move_generation_2(self):
+        '''More complex test of move generation.  Still exclude pawns, but include all other piece types.
+        Should include castling, blocking of castling through check, an absolute pin, blocking of 
+        moving into check, anything else?
+        position is: 
+          +-------------------------------+
+        8 | r | - | - | - | k | - | - | r |
+          |---|---|---|---|---|---|---|---|
+        7 | - | b | - | - | - | - | - | - |
+          |---|---|---|---|---|---|---|---|
+        6 | - | - | - | - | - | - | n | - |
+          |---|---|---|---|---|---|---|---|
+        5 | - | - | - | - | - | Q | - | B |
+          |---|---|---|---|---|---|---|---|
+        4 | - | - | - | - | - | - | - | - |
+          |---|---|---|---|---|---|---|---|
+        3 | - | - | - | - | - | N | - | - |
+          |---|---|---|---|---|---|---|---|
+        2 | - | - | - | - | - | - | - | - |
+          |---|---|---|---|---|---|---|---|
+        1 | R | - | - | - | K | - | - | R |
+          +-------------------------------+
+            a   b   c   d   e   f   g   h
+
+        '''
+        piece_list = [King('w','e1'), Rook('w','h1'), Rook('w','a1'),
+                        Knight('w','f3'), Bishop('w','h5'), Queen('w','f5'),
+                        King('b','e8'), Rook('b','h8'), Rook('b','a8'),
+                        Knight('b','g6'), Bishop('b','b7')]
+        b = Board(piece_list=piece_list)
+        g = Game()
+        g.set_board(b)
+        g.set_white_to_move()
+        white_moves = g.get_moves_for()
+        white_move_strs = [move.to_long_algebraic() for move in white_moves]
+        # White has lots of moves, including castling to either side
+        assert 'O-O' in white_move_strs, "Castling kingside ('O-O') should be among allowed moves for White, but didn't make it into the list of moves!"
+        assert 'O-O-O' in white_move_strs, "Castling queenside ('O-O-O') should be among allowed moves for White, but didn't make it into the list of moves!"
+        # BLACK
+        g.set_black_to_move()
+        black_moves = g.get_moves_for()
+        black_move_strs = [move.to_long_algebraic() for move in black_moves]
+        # Black also has lots of moves, but castling should be blocked: queenside because moving into check, kingside because caslting through check
+        assert 'O-O' not in black_move_strs, "Castling kingside should not be among allowed moves for Black, because the white Q is attacking the square the king would move through, but it is on the list of moves anyway!"
+        assert 'O-O-O' not in black_move_strs, "Castling queenside should not be among allowed moves for Black, because the white Q is attacking the square the king would move into, but it is on the list of moves anyway!"
+        into_check_moves = ['Ke8d7', 'Ke8f8', 'Ke8f7']
+        for move_str in black_move_strs:
+            assert move_str not in into_check_moves, "Tried to move into check with %s!" % (move_str)
+            assert "N" not in [m[0] for m in black_move_strs], "Tried to move pinned knight with %s" % (move_str)
+        # Can add many more checks here, but this is probably good to start
+       
+
+
+
+
 def run_me_if_i_am_the_main_file():
     
     # Prepare the loudmouth
@@ -974,12 +1252,20 @@ def run_me_if_i_am_the_main_file():
 
     print('Testing move generation and Piece objects...')
     g = Game()
-    K = King('w', 'e1')
-    k = King('b', 'e8')
-    b = Board(piece_list=[K, k])
-    g.set_board(b)
-    moves = g.get_moves_for()
-    print(moves)
+    # Create pieces to place on board
+    K = King('w', 'e1') # white king on e1
+    k = King('b', 'e8') # black king on e8
+    b = Board(piece_list=[K, k]) # create board from list of placed pieces
+    g.set_board(b) # Associate board with Game object
+    moves = g.get_moves_for() # get moves for the side to move (white by default)
+    move_strings = [str(move) for move in moves] # make string (long algebraic) representations of each move
+    print('List of possible moves:')
+    print(move_strings)
+
+    # Run all unit tests
+    TestRLM().run_all_tests()
+
+
 
 
 def run_him_if_i_am_not_the_main_file():
