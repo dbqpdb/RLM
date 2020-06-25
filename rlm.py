@@ -38,6 +38,7 @@ class Board:
         self.pieces = ['P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k']
         self.glyphs = ['♟︎', '♜', '♞', '♝', '♛', '♚', '♙', '♖', '♘', '♗', '♕', '♔']
         self.glyphmap = dict(zip(self.pieces, self.glyphs))
+        self.use_glyphs = True
 
         #print('running init...')
         if board_position is None and piece_list is None:
@@ -251,14 +252,17 @@ class Board:
         for rank_num in range(8,0,-1):
             row_idx = rank_num-1
             row = list(self.board_array[row_idx,:]) # get list of piece characters (including '-' for empty squares)
-            board_string += make_row_string(rank_num, row)
+            row_string = make_row_string(rank_num, row)
+            # Substitute glyphs for letters if requested...
+            if self.use_glyphs:
+                for piece, glyph in self.glyphmap.items():
+                    row_string = row_string.replace(piece, glyph)
+            board_string += row_string
             if rank_num > 1:
                 board_string += internal_row_edge
             else:
                 board_string += lower_edge
         board_string += file_labels
-        for piece, glyph in self.glyphmap.items():
-            board_string = board_string.replace(piece, glyph)
         return board_string
 
 
