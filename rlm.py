@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # RLM.py
 #
 # The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing 
@@ -439,12 +439,12 @@ def run_me_if_i_am_the_main_file():
     FEN_board_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
     board_array_from_FEN = Board.convert_FEN_to_board_array(FEN_board_string)
     print('Board array generated from FEN board string "%s": \n%s'%(FEN_board_string, board_array_from_FEN))
-    me.propound("If {noun}s were {noun}s, man, you'd {adverb} {verb} {determiner} {noun}!")
+    me.propound("If {noun} were {noun}, man, you'd {adverb} {verb} {determiner} {noun}!")
     # Create a board from a different FEN-type string
     FEN_board_string_2 = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2" # after 1. e4 c5; 2. Nf3 
     otherBoard = Board(FEN_board_string_2)
     print('Board array generated from FEN board string "%s": \n%s'%(FEN_board_string_2, str(otherBoard.board_array)))
-    me.propound("There once was a {noun} named {name} from a {adjective} {noun}. Anyway, {pronoun} {adverb} {verb}s.")
+    me.propound("There once was a {noun} named {name} from a {adjective} {noun}. Anyway, {pronoun} {adverb} {verb}.")
     # Create a board from an existing board array
     board_array_from_FEN[4,4] = 'Q' # add a white queen at e5
     boardFromArray = Board(board_array_from_FEN)
