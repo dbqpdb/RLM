@@ -534,6 +534,157 @@ class Move:
         rank_number = '%i'%(sq[1]+1)
         return file_letter+rank_number
 
+    @classmethod
+    def parse_entered_move(entered_move, game=None, legal_move_list=None):
+        '''Parse human-entered move string to a Move object'''
+        ''' 
+        Need to determine:
+        * piece character
+        * source square
+        * destination square
+        * captured_piece (by inspection of dest square?)
+        * is_castling 
+        * promotion_piece
+        * is_en_passant_capture
+        * new_en_passant_square (if two square pawn move)
+        *
+        Some of these would require a Game object to determine, especially if
+        the user uses an abbreviated move format. Legal move list might be helpful for 
+        narrowing down possibilities
+
+        Examples we might need to parse:
+        e4 (pawn on e file which can reach e4, could be on e2 or e3)
+        exd5 (pawn on e file captures whatever piece is on d4)
+        Rxc1 (rook which can reach c1 captures whatever is on c1)
+        RxBc1 (rook which can reach c1 captures a bishop on c1)
+        Rc1 (rook which can reach c1 moves to or captures whatever is c1)
+        Rac1 (Rook on a1 moves to c1 (to disambiguate from another rook which can reach c1))
+        R1c1 (rook on first rank moves to c1 (to disambiguate from, e.g. a rook on c3 which could also reach c1))
+        o-o or O-O or 0-0 (kingside castling using letter o or numeral zero)
+        RxB (whatever rook can capture a bishop does so, look through legal move list for one which matches, request clarification if ambiguous)
+        Nb1c3 (easiest form, has source and destination squares and piece name)
+        '''
+
+        kingside_castling_patt = re.compile(r"^\s*([oO0])-\1\s*")
+        queenside_castling_patt = re.compile(r"^\s*([oO0])-\1-\1\s*")
+        no_dest_capture_patt = re.compile(r"""
+            ^\s*
+            (?P<moving_piece>[KQRBNPkqrbnp]) # pieces which can capture
+            x
+            (?P<captured_piece>[QRBNPqrbnp]) # pieces which can be captured
+            \s*$
+            """, re.VERBOSE) # Matches moves like RxB with no square information
+        normal_move_patt = re.compile(r"""
+            \s*                             # ignore any leading whitespace
+            (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
+            (?P<source_square>[a-h]?[1-8])? # any elements of the source square, if present
+            (?P<capture_indicator>x?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
+            (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
+            ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
+              (?P<promotion_piece>[QRBNqrbn]) # promotion piece character
+            )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)      
+            \s*$                            # Ignore any trailing whitespace
+            """, re.VERBOSE)
+
+        if kingside_castling_patt.match(entered_move):
+            # TODO resume work right here refactoring code below
+            
+        # Castling (identified by o, O, or 0)
+        if entered_move[0].lower()=='o' or entered_move[0]=='0':
+            is_castling = True
+            if entered_move == entered_move[0]+'-'+entered_move[0]:
+                # Kingside castling
+                if game is not None:
+                    if game.side_to_move[0] == 'w':
+                        move = Move('K', 'e1', 'g1', is_castling=True)
+                    elif game.side_to_move[0] == 'b':
+                        move = Move('k', 'e8', 'g8', is_castling=True)
+                    else:
+                        raise Exception('Side to move must be either "w" or "b"')
+                elif legal_move_list is not None and len(legal_move_list)>0: # game is None
+                    # side can be determine by case of legal move char's
+                    if legal_move_list[0].char.upper()==legal_move_list[0].char:
+                        move = Move('K', 'e1', 'g1', is_castling=True)
+                    else:
+                        move = Move('k', 'e8', 'g8', is_castling=True)
+                else: 
+                    # Couldn't parse because we can't tell which side is to move
+                    move = None
+            elif entered_move == entered_move[0]+'-'+entered_move[0]+'-'+entered_move[0]:
+                # Queenside castling
+                if game is not None:
+                    if game.side_to_move[0] =='w':
+                        move = Move('K','e1', 'c1', is_castling=True)
+                    elif game.side_to_move[0] == 'b':
+                        move = Move('k','e8', 'c8', is_castling=True)
+                    else:
+                        raise Exception('Side to move must be either "w" or "b"')
+                elif legal_move_list is not None and len(legal_move_list)>0: # game is None
+                    # side can be determine by case of legal move char's
+                    if legal_move_list[0].char.upper()==legal_move_list[0].char:
+                        move = Move('K', 'e1', 'c1', is_castling=True)
+                    else:
+                        move = Move('k', 'e8', 'c8', is_castling=True)
+                else: 
+                    # Couldn't parse because we can't tell which side is to move
+                    move = None
+            else:
+                # Move starts with o, O, or 0, but doesn't match castling patterns (o-o or o-o-o)
+                move = None
+        # Not castling
+  
+        return move # None if couldn't parse?
+
+class Player:
+    ''' Parent class for players
+    '''
+    def __init__(self, color=None):
+        self.set_color(color)
+    
+    def set_color(self, color):
+        if color is None:
+            self.color = None
+        elif color[0].lower()=='w':
+            self.color = 'w'
+        elif color[0].lower()=='b':
+            self.color = 'b'
+        else:
+            raise Exception('Invalid color')
+
+    def choose_move(self, game, legal_moves_list):
+        '''Placeholder which subclasses should implement, needs to return a Move object'''
+        pass
+
+class RLMPlayer (Player):
+    ''' Class to encapsulate RLM player behaviors
+    '''
+    def choose_move(self, game, legal_moves_list):
+        # RLM player generates the list of possible legal moves, and chooses a random one off the list
+        return random.choice(legal_moves_list)
+
+class HumanPlayer (Player):
+    ''' Class to handle interaction with human player during a game (mostly requesting a move)
+    '''
+    def choose_move(self, game, legal_moves_list):
+        '''Prompt the human player to enter a move'''
+        entered_move = input("What is your move?\nEnter move: ") # TODO make this better
+        # Convert entered move to Move object
+        move = Move.parse_entered_move(entered_move)
+        # Validate by checking if this move is on the legal_moves_list
+        while not self.is_valid_move(move, legal_moves_list):
+            entered_move = input("That wasn't valid, try again!!\nEnter move: ") # TODO make this way better (change level of response, be more helpful, etc.)
+            move = Move.parse_entered_move(entered_move)
+        return move
+    
+
+    
+
+class NRLMPlayer (Player):
+    '''Non-Random Legal Move Player.  Chooses moves in a non-random way (currently just the first move on the legal move list)
+    '''
+    def choose_move(self, game, legal_moves_list):
+        return legal_moves_list[0]
+
 
 class GameController:
     '''
@@ -542,6 +693,61 @@ class GameController:
     post-game processes (e.g. saving to PGN).  Game state should be held in a Game 
     object, board state in a Board object.  
     '''
+    '''
+    Move generation is complete, what would we need to add to have a playable game?
+    * Interface with human player (prompts, move validation)
+    * Record game history
+    * Recognize checkmate and stalemate and handle game end
+    '''
+
+    def start_new_game(self):
+        '''Start a new game'''
+        # Ask about playing game
+        start_game_answer = input('Hey there, do you want to play a game of chess?\n(Y/n): ')
+        if len(start_game_answer)>0 and start_game_answer[0].lower()=='n':
+            print("Fine!! I'll play myself then!! You can watch.')
+            return
+        # Choose colors
+        side_answer = input('Would you like to play as white or black?\n(W/b): ')
+        if len(side_answer)>0 and side_answer[0].lower()=='b':
+            print("OK, I'll play as white!")
+            rlm_player_side = 'w'
+            human_player_side = 'b'
+        else:
+            print("OK, I'll play as black!")
+            rlm_player_side = 'b'
+            human_player_side = 'w'
+        # Initialize game and force normal starting position for now...
+        game = Game()
+        game.set_board = Board() # defaults to normal starting position
+
+        print("Here is the starting position:")
+        game.show_board()
+
+        # The game loop
+        game_is_over = False
+        while not game_is_over:
+            if game.side_to_move[0] == rlm_player_side:
+                # RLM needs to pick a move
+                legal_moves = game.get_moves_for()
+
+            elif game.side_to_move[0] == human_player_side:
+                # Human player needs to enter a move
+                # Prompt
+                # Validate
+            else: 
+                raise Exeception("Something has gone wrong, game.side_to_move doesn't appear to correspond to a RLM player or a human player...")
+
+            # Check if the game is over
+            # * checkmate or stalemate
+            # * 50 moves w/o capture or pawn move
+
+        # Get here at game end...
+
+
+
+
+
 class Game:
     '''Class to hold a game state.  Game state includes everything in an FEN, plus
     a unique GameID.  Probably makes sense for it to keep track of everything that
@@ -573,11 +779,15 @@ class Game:
         self.board = board
         self.initialize_pieces_from_board(board)
 
+    def show_board(self):
+        '''Print board string (could also be configured to call a graphical displayer once we've worked that out)'''
+        print(game.board)
+
     def make_move(self, move, change_side_to_move=True):
         '''Update board and pieces based on move.  change_side_to_move flag determines
         whether the side_to_move is changed (default) or remains in current state, which
         is desirable for imagined moves.  
-        NOTE that this update the game's Board object and replaces the Piece objects
+        NOTE that this updates the game's Board object and replaces the Piece objects
         This may need to be changed in the future if piece objects got more complex and
         were storing something like a move history, or anything like that. '''
 
