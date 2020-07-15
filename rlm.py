@@ -586,54 +586,77 @@ class Move:
             \s*$                            # Ignore any trailing whitespace
             """, re.VERBOSE)
 
-        if kingside_castling_patt.match(entered_move):
-            # TODO resume work right here refactoring code below
-            
-        # Castling (identified by o, O, or 0)
-        if entered_move[0].lower()=='o' or entered_move[0]=='0':
-            is_castling = True
-            if entered_move == entered_move[0]+'-'+entered_move[0]:
-                # Kingside castling
-                if game is not None:
-                    if game.side_to_move[0] == 'w':
-                        move = Move('K', 'e1', 'g1', is_castling=True)
-                    elif game.side_to_move[0] == 'b':
-                        move = Move('k', 'e8', 'g8', is_castling=True)
-                    else:
-                        raise Exception('Side to move must be either "w" or "b"')
-                elif legal_move_list is not None and len(legal_move_list)>0: # game is None
-                    # side can be determine by case of legal move char's
-                    if legal_move_list[0].char.upper()==legal_move_list[0].char:
-                        move = Move('K', 'e1', 'g1', is_castling=True)
-                    else:
-                        move = Move('k', 'e8', 'g8', is_castling=True)
-                else: 
-                    # Couldn't parse because we can't tell which side is to move
-                    move = None
-            elif entered_move == entered_move[0]+'-'+entered_move[0]+'-'+entered_move[0]:
-                # Queenside castling
-                if game is not None:
-                    if game.side_to_move[0] =='w':
-                        move = Move('K','e1', 'c1', is_castling=True)
-                    elif game.side_to_move[0] == 'b':
-                        move = Move('k','e8', 'c8', is_castling=True)
-                    else:
-                        raise Exception('Side to move must be either "w" or "b"')
-                elif legal_move_list is not None and len(legal_move_list)>0: # game is None
-                    # side can be determine by case of legal move char's
-                    if legal_move_list[0].char.upper()==legal_move_list[0].char:
-                        move = Move('K', 'e1', 'c1', is_castling=True)
-                    else:
-                        move = Move('k', 'e8', 'c8', is_castling=True)
-                else: 
-                    # Couldn't parse because we can't tell which side is to move
-                    move = None
-            else:
-                # Move starts with o, O, or 0, but doesn't match castling patterns (o-o or o-o-o)
+        # Queenside castling (queenside first because kingside pattern will match queenside castling)
+        if queenside_castling_patt.match(entered_move):
+            # Queenside castling
+            if game is not None:
+                if game.side_to_move[0] =='w':
+                    move = Move('K','e1', 'c1', is_castling=True)
+                elif game.side_to_move[0] == 'b':
+                    move = Move('k','e8', 'c8', is_castling=True)
+                else:
+                    raise Exception('Side to move must be either "w" or "b"')
+            elif legal_move_list is not None and len(legal_move_list)>0: # game is None
+                # side can be determine by case of legal move char's
+                if legal_move_list[0].char.upper()==legal_move_list[0].char:
+                    move = Move('K', 'e1', 'c1', is_castling=True)
+                else:
+                    move = Move('k', 'e8', 'c8', is_castling=True)
+            else: 
+                # Couldn't parse because we can't tell which side is to move
                 move = None
-        # Not castling
+        # Kingside castling
+        elif kingside_castling_patt.match(entered_move):
+            # TODO resume work right here refactoring code below
+            if game is not None:
+                if game.side_to_move[0] == 'w':
+                    move = Move('K', 'e1', 'g1', is_castling=True)
+                elif game.side_to_move[0] == 'b':
+                    move = Move('k', 'e8', 'g8', is_castling=True)
+                else:
+                    raise Exception('Side to move must be either "w" or "b"')
+            elif legal_move_list is not None and len(legal_move_list)>0: # game is None
+                # side can be determine by case of legal move char's
+                if legal_move_list[0].char.upper()==legal_move_list[0].char:
+                    move = Move('K', 'e1', 'g1', is_castling=True)
+                else:
+                    move = Move('k', 'e8', 'g8', is_castling=True)
+            else: 
+                # Couldn't parse because we can't tell which side is to move
+                move = None
+        # Abbreviated capture moves
+        elif no_dest_capture_patt.match(entered_move):
+            # We will need to use the legal move list to narrow down what the user could mean, the entered move may be ambiguous
+            move=None # TODO WORKING HERE
+        # Normal moves (minimally including a destination square)
+        elif normal_move_patt.match(entered_move):
+            move=None # TODO WORKING HERE
+
+        
   
-        return move # None if couldn't parse?
+        return move # None if couldn't parse?, TODO: maybe add msg about why if we can figure that out?
+    @classmethod
+    def is_on_move_list(cls, move, move_list):
+        # Returns true if given move is on given move list
+        for list_move in move_list:
+            if list_move == move:
+                return True
+        return False
+
+    def __eq__(self, move_to_match):
+        # Returns true if self and move_to_match represent the same move in all respects
+        if (self.single_char == move_to_match.single_char and
+            self.starting_square == move_to_match.starting_square and
+            self.destination_square == move_to_match.destination_square and
+            self.captured_piece == move_to_match.captured_piece and
+            self.promotion_piece == move_to_match.promotion_piece and
+            self.is_en_passant_capture == move_to_match.is_en_passant_capture and
+            self.new_en_passant_square == self.new_en_passant_square):
+            return True
+        else:
+            return False
+
+        
 
 class Player:
     ''' Parent class for players
@@ -655,6 +678,10 @@ class Player:
         '''Placeholder which subclasses should implement, needs to return a Move object'''
         pass
 
+    def is_valid_move(self, move, legal_move_list):
+        # Checks if move matches one on legal move list
+        pass # Maybe should be a Move function??? Maybe want Game object too?
+
 class RLMPlayer (Player):
     ''' Class to encapsulate RLM player behaviors
     '''
@@ -671,7 +698,7 @@ class HumanPlayer (Player):
         # Convert entered move to Move object
         move = Move.parse_entered_move(entered_move)
         # Validate by checking if this move is on the legal_moves_list
-        while not self.is_valid_move(move, legal_moves_list):
+        while not Move.is_on_move_list(move, move_list=legal_moves_list):
             entered_move = input("That wasn't valid, try again!!\nEnter move: ") # TODO make this way better (change level of response, be more helpful, etc.)
             move = Move.parse_entered_move(entered_move)
         return move
@@ -705,7 +732,7 @@ class GameController:
         # Ask about playing game
         start_game_answer = input('Hey there, do you want to play a game of chess?\n(Y/n): ')
         if len(start_game_answer)>0 and start_game_answer[0].lower()=='n':
-            print("Fine!! I'll play myself then!! You can watch.')
+            print("Fine!! I'll play myself then!! You can watch.")
             return
         # Choose colors
         side_answer = input('Would you like to play as white or black?\n(W/b): ')
@@ -735,8 +762,9 @@ class GameController:
                 # Human player needs to enter a move
                 # Prompt
                 # Validate
+                pass
             else: 
-                raise Exeception("Something has gone wrong, game.side_to_move doesn't appear to correspond to a RLM player or a human player...")
+                raise Exception("Something has gone wrong, game.side_to_move doesn't appear to correspond to a RLM player or a human player...")
 
             # Check if the game is over
             # * checkmate or stalemate
@@ -781,7 +809,7 @@ class Game:
 
     def show_board(self):
         '''Print board string (could also be configured to call a graphical displayer once we've worked that out)'''
-        print(game.board)
+        print(self.board)
 
     def make_move(self, move, change_side_to_move=True):
         '''Update board and pieces based on move.  change_side_to_move flag determines
