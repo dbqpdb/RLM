@@ -550,11 +550,11 @@ class Move:
         *
         Some of these would require a Game object to determine, especially if
         the user uses an abbreviated move format. Legal move list might be helpful for 
-        narrowing down possibilities
+        narrowing down possibilities. Given a Game object, the legal move list could be generated if not given. 
 
         Examples we might need to parse:
         e4 (pawn on e file which can reach e4, could be on e2 or e3)
-        exd5 (pawn on e file captures whatever piece is on d4)
+        exd5 (pawn on e file captures whatever piece is on d5)
         Rxc1 (rook which can reach c1 captures whatever is on c1)
         RxBc1 (rook which can reach c1 captures a bishop on c1)
         Rc1 (rook which can reach c1 moves to or captures whatever is c1)
@@ -572,69 +572,150 @@ class Move:
             (?P<moving_piece>[KQRBNPkqrbnp]) # pieces which can capture
             x
             (?P<captured_piece>[QRBNPqrbnp]) # pieces which can be captured
+            [+]? # check indicator (optional and ignored)
             \s*$
             """, re.VERBOSE) # Matches moves like RxB with no square information
         normal_move_patt = re.compile(r"""
             \s*                             # ignore any leading whitespace
             (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
             (?P<source_square>[a-h]?[1-8])? # any elements of the source square, if present
-            (?P<capture_indicator>x?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
+            (?P<capture_indicator>x[QRBNqrbn]?)?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
             (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
             ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
               (?P<promotion_piece>[QRBNqrbn]) # promotion piece character
-            )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)      
+            )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)
+            (?P<ep_capture_indicator>e[.]?p[.]?) # optional ep or e.p. to indicate en passant capture (always optional but could use to catch user errors)
+            [+]? # check indicator (optional and ignored)      
             \s*$                            # Ignore any trailing whitespace
             """, re.VERBOSE)
 
+        # Determine side to move from either the game or the list of legal moves
+        if game is not None:
+            side_to_move = game.side_to_move[0]
+        elif legal_move_list is not None and len(legal_move_list)>0:
+            if legal_move_list[0].single_char==legal_move_list[0].single_char.upper():
+                side_to_move = 'w'
+            else:
+                side_to_move = 'b'
+        else: 
+            # Can't yet determine side to move
+            side_to_move = None #unsure
+
+        msg = None
         # Queenside castling (queenside first because kingside pattern will match queenside castling)
         if queenside_castling_patt.match(entered_move):
             # Queenside castling
-            if game is not None:
-                if game.side_to_move[0] =='w':
-                    move = Move('K','e1', 'c1', is_castling=True)
-                elif game.side_to_move[0] == 'b':
-                    move = Move('k','e8', 'c8', is_castling=True)
-                else:
-                    raise Exception('Side to move must be either "w" or "b"')
-            elif legal_move_list is not None and len(legal_move_list)>0: # game is None
-                # side can be determine by case of legal move char's
-                if legal_move_list[0].char.upper()==legal_move_list[0].char:
-                    move = Move('K', 'e1', 'c1', is_castling=True)
-                else:
-                    move = Move('k', 'e8', 'c8', is_castling=True)
-            else: 
-                # Couldn't parse because we can't tell which side is to move
+            if side_to_move == 'w':
+                move = Move('K','e1', 'c1', is_castling=True)
+            elif side_to_move == 'b':
+                move = Move('k','e8', 'c8', is_castling=True)
+            elif side_to_move is None:
                 move = None
+                msg = "Move parses as queenside castling, but without a Game object or a legal move list, it was impossible to guess which side was moving!"
         # Kingside castling
         elif kingside_castling_patt.match(entered_move):
-            # TODO resume work right here refactoring code below
-            if game is not None:
-                if game.side_to_move[0] == 'w':
-                    move = Move('K', 'e1', 'g1', is_castling=True)
-                elif game.side_to_move[0] == 'b':
-                    move = Move('k', 'e8', 'g8', is_castling=True)
-                else:
-                    raise Exception('Side to move must be either "w" or "b"')
-            elif legal_move_list is not None and len(legal_move_list)>0: # game is None
-                # side can be determine by case of legal move char's
-                if legal_move_list[0].char.upper()==legal_move_list[0].char:
-                    move = Move('K', 'e1', 'g1', is_castling=True)
-                else:
-                    move = Move('k', 'e8', 'g8', is_castling=True)
-            else: 
-                # Couldn't parse because we can't tell which side is to move
+            if side_to_move == 'w':
+                move = Move('K', 'e1', 'g1', is_castling=True)
+            elif side_to_move == 'b':
+                move = Move('k', 'e8', 'g8', is_castling=True)
+            elif side_to_move is None:
                 move = None
-        # Abbreviated capture moves
+                msg = "Move parses as kingside castling, but without a Game object or a legal move list, it was impossible to guess which side was moving!"
+        # Abbreviated capture moves (like RxB)
         elif no_dest_capture_patt.match(entered_move):
             # We will need to use the legal move list to narrow down what the user could mean, the entered move may be ambiguous
-            move=None # TODO WORKING HERE
+            m = no_dest_capture_patt.match(entered_move)
+            moving_piece = m.group('moving_piece')
+            captured_piece = m.group('captured_piece')
+            if legal_move_list is not None:
+                if side_to_move == 'w':
+                    moving_piece = moving_piece.upper()
+                    captured_piece = captured_piece.lower()
+                elif side_to_move == 'b':
+                    moving_piece = moving_piece.lower()
+                    captured_piece = captured_piece.upper()
+                # Narrow down by moving piece and captured piece
+                possible_moves = [m for m in legal_move_list if m.single_char == moving_piece and m.captured_piece == captured_piece]
+                if len(possible_moves)==0:
+                    move = None
+                    msg = "There does not seem to be a legal move where your piece '%s' captures an enemy piece '%s'!"%(moving_piece, captured_piece)
+                elif len(possible_moves)==1:
+                    # One possible match, assume this is the move intended
+                    move = possible_moves[0]
+                else:
+                    # Multiple possible moves
+                    move = None
+                    msg = "Your move, %s, is ambiguous, which of the following do you mean: %s"
+                    for m in possible_moves[1:]:
+                        msg += ',or %s'%(m.to_long_algebraic())
+                    msg += '?\n'
+            else:
+                # No move list available
+                move = None
+                msg = "An abbreviated capture move, such as you entered, can't be parsed without a non-empty list of legal moves!"  
         # Normal moves (minimally including a destination square)
         elif normal_move_patt.match(entered_move):
+            m = normal_move_patt.match(entered_move)
+            piece_char = m.group('piece_char') # may be None
+            source_square = m.group('source_square')
+            capture_indicator = m.group('capture_indicator')
+            dest_square = m.group('dest_square') # this is the only non-optional part of the match, this must be present if we are in this branch
+            promotion_indicator = m.group('promotion_indicator')
+            promotion_piece = m.group('promotion_piece')
+            # There are two approaches we could take here... build the move as far as possible from the entered input, THEN use the legal move list 
+            # to narrow down any ambiguities, OR, we could start from the legal move list, narrow it down to those with the correct destination square
+            # and then compare from there...
+            if legal_move_list is not None:
+                possible_legal_moves = [m for m in legal_move_list if Board().is_same_square(m.destination_square, dest_square)]
+            if piece_char is None: 
+                if source_square is None:
+                    # Assume pawn (no source square to look on)
+                    if side_to_move == 'w':
+                        piece_char = 'P'
+                    elif side_to_move =='b':
+                        piece_char = 'p'
+                else:
+                    # piece_char is none, but at least one element of source square is provided
+                    # This section needs to determine the piece char and the full source square (if only partial is provided)
+                    if len(source_square)==2:
+                        # full source square is provided, we can supply the piece by looking on the board if we have a Game
+                        if game is not None:
+                            piece_char = game.board[source_square]
+                            if piece_char == Board.EMPTY_SQUARE:
+                                return None, 'Your entered move starts from %s, but there is no piece on that square!'%(source_square)
+                        elif legal_move_list is not None:
+                            # look through legal moves for one with the correct destination square 
+                            if len(possible_legal_moves)==0:
+                                move = None
+                                msg = "Your entered move, %s, indicates a destination square of %s and omits an indication of the moving piece.\nHowever, there are no legal moves to that destination square!"%(entered_move, dest_square)
+                                return move, msg
+                            elif len(possible_legal_moves)==1:
+                                only_legal_move = possible_legal_moves[0]
+                                if capture_indicator is not None and not only_legal_move.is_capture():
+                                    move = None
+                                    msg = "You indicated a capture in your move, but there is no piece to capture on %s!"%(dest_square)
+                                else:
+                                    # No other important way the user could have entered a conflicting move, just use the only legal move
+                                    move = only_legal_move 
+                                    return move, msg
+                            elif len(possible_legal_moves)>1:
+                                # Multiple legal moves to the destination square, use the one which comes from the given source square
+                                # (possible exception is pawn promotion, where there could be multiple moves with the same source and destination square, just different promotion pieces)
+                                pass # TODO WORKING RIGHT HERE
+               
+                    elif len(source_square)==1:
+                        # piece char is none, and only one element (the file or the rank) is provided, definitely need to narrow stuff down
+                        pass
+            if source_square is None:
+                # Look for 
+                pass
+            dest_square
+                
             move=None # TODO WORKING HERE
 
         
   
-        return move # None if couldn't parse?, TODO: maybe add msg about why if we can figure that out?
+        return move, msg # None if couldn't parse?, TODO: maybe add msg about why if we can figure that out?
     @classmethod
     def is_on_move_list(cls, move, move_list):
         # Returns true if given move is on given move list
