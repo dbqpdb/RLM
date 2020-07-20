@@ -219,6 +219,18 @@ class Board:
             sq2 = cls.square_name_to_array_idxs(square_name_2)
             return sq1==sq2
 
+    @classmethod
+    def square_rank_str(cls, square_idxs):
+        # Returns the rank number as a single character string
+        return str(int(square_idxs[1]))
+
+    @classmethod
+    def square_file_lett(cls, square_idxs):
+        # Returns the file letter as a single character string
+        file_idx = square_idxs[0]
+        file_lett = Board.IDX_TO_FILE_DICT[file_idx]
+        return file_lett
+
     def __str__(self):
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
         # How about something like this:
@@ -669,11 +681,21 @@ class Move:
                 possible_legal_moves = [m for m in legal_move_list if Board().is_same_square(m.destination_square, dest_square)]
             if piece_char is None: 
                 if source_square is None:
-                    # Assume pawn (no source square to look on)
-                    if side_to_move == 'w':
-                        piece_char = 'P'
-                    elif side_to_move =='b':
-                        piece_char = 'p'
+                    # No piece char and no source square, impossible to disambiguate without the legal moves list
+                    if legal_move_list is not None:
+                        # Try to determine full move by matching destination square alone. 
+                        if len(possible_legal_moves)==0:
+                            move = None
+                            msg = "Your entered move, %s, omits the moving piece and it's starting square. There appear to be no legal moves which have %s as a destination square"%(entered_move, dest_square)
+                        elif len(possible_legal_moves)==1:
+                            move = possible_legal_moves[0]
+                        else:
+                            move = None
+                            msg = "Your entered move, %s, omits the moving piece and it's starting square. There appear to be multiple legal moves which have %s as a destination square, please disambiguate"%(entered_move, dest_square)
+                            # OR could assume pawn move here...
+                    else: # no legal move list available
+                        move = None
+                        msg = "Your entered move, %s, omits the moving piece and \nit's starting square.  In the absence of a game or legal move list, \nI can't guess what all the move characteristics would be."%(entered_move) 
                 else:
                     # piece_char is none, but at least one element of source square is provided
                     # This section needs to determine the piece char and the full source square (if only partial is provided)
@@ -701,21 +723,78 @@ class Move:
                             elif len(possible_legal_moves)>1:
                                 # Multiple legal moves to the destination square, use the one which comes from the given source square
                                 # (possible exception is pawn promotion, where there could be multiple moves with the same source and destination square, just different promotion pieces)
-                                pass # TODO WORKING RIGHT HERE
-               
+                                moves_with_correct_starting_square = [m for m in possible_legal_moves if Board().is_same_square(m.source_square, source_square)]
+                                if len(moves_with_correct_starting_square)==0:
+                                    move = None
+                                    msg = "Your entered move, %s, indicates a destination square of %s and a\n source square of %s, but there don't appear to be any legal moves from and to those squares!"%(entered_move,dest_square,source_square)
+                                elif len(moves_with_correct_starting_square)==1:
+                                    move = moves_with_correct_starting_square[0]
+                                else: # more than one legal move with same source and destination squares (must be pawn promotion)
+                                    if promotion_piece is None:
+                                        move = None
+                                        msg = "Your entered move, %s, matches multiple legal moves, did you forget to supply a promotion piece (e.g. =Q)?"%(entered_move)
+                                    else:
+                                        # Find the move with the matching promotion piece (disregarding case)
+                                        moves_with_matching_promotion = [m for m in moves_with_correct_starting_square if m.promotion_piece.upper()==promotion_piece.upper()]
+                                        if len(moves_with_matching_promotion)==0:
+                                            # I don't think this case should actually be reachable... (matching source and destination, promotion piece specified, there should always be one match)
+                                            move = None
+                                            msg = "Your entered move, %s, seems to indicate pawn promotion to '%s', but that move does not appear to be a legal move."%(entered_move, promotion_piece)
+                                        elif len(moves_with_matching_promotion)==1:
+                                            move = moves_with_matching_promotion[0]
+                                        else: 
+                                            move = None
+                                            msg = "Your entered move, %s, matches multiple legal moves, \nthough I'm not sure how that's possible since you've specified a source square (%s), \ndestination square (%s), and promotion piece (%s)."%(entered_move, source_square, dest_square, promotion_piece)
+                        else:
+                            # game and legal move list and piece character not provided, but source and destination squares provided
+                            # Should we force assumption of pawn move in this case? I think we need to report it as not parseable
+                            move = None
+                            msg = "Your entered move, %s, can't be parsed into a full Move object because you have omitted the moving piece character, and without a game or legal move list, it is impossible to deduce the color or type of piece moving."%(entered_move)
                     elif len(source_square)==1:
                         # piece char is none, and only one element (the file or the rank) is provided, definitely need to narrow stuff down
-                        pass
-            if source_square is None:
-                # Look for 
-                pass
-            dest_square
-                
-            move=None # TODO WORKING HERE
+                        if legal_move_list is None:
+                            move=None
+                            msg = "Your entered move, %s, can't be parsed without a game or legal move list, because it is missing the piece character and part of the source square."%(entered_move)
+                        else: # legal move list is not None
+                            # Try to find a match from the possible_legal_moves list
+                            # (this is trickier because we only have a partial indicator of the source square, either the file or the rank, but not both)
+                            file_is_known = source_square in 'abcdefABCDEF'
+                            rank_is_known = source_square in '12345678'
+                            if file_is_known:
+                                moves_with_matching_file = [m for m in possible_legal_moves if Board.square_file_lett(m.starting_square)==source_square.lower()]
+                                if len(moves_with_matching_file)==0:
+                                    move=None
+                                    msg = "Your entered move, %s, is missing both piece information and full starting square information. \nThere does not appear to be any legal move going from the %s-file to %s."%(entered_move, source_square, dest_square)
+                                elif len(moves_with_matching_file)==1:
+                                    move = moves_with_matching_file[0]
+                                else: # len >1
+                                    move = None
+                                    msg = "Your entered move, %s, is not sufficient to disambiguate among the possible legal moves. \nYou may need to fully specify the starting square or a promotion piece."%(entered_move)
+                            elif rank_is_known:
+                                moves_with_matching_rank = [m for m in possible_legal_moves if Board().square_rank_str(m.starting_square)==source_square]
+                                if len(moves_with_matching_rank)==0:
+                                    move = None
+                                    msg = "Your entered move, %s, is missing both piece information and full starting square information. \nThere does not appear to be any legal move going from ranks %s to %s."%(entered_move, source_square, dest_square)
+                                elif len(moves_with_matching_rank)==1:
+                                    move = moves_with_matching_rank[0]
+                                else: # len > 1
+                                    move = None
+                                    msg = "Your entered move, %s, is not sufficient to disambiguate among the possible legal moves. \nYou may need to fully specify the starting square or a promotion piece."%(entered_move)
+                            else:
+                                move = None
+                                msg = "No piece char, source square SAID it partially matched, but neither file nor rank appears to be known at this point. Not sure what's gone wrong."
+            else: # piece_char is not None  
+                # Can now use piece character to help narrow down choices when there is ambiguity
+                if source_square is None:
+                    # Have piece character but no source square, need to disambiguate using move list
+                    pass
+             
 
         
   
         return move, msg # None if couldn't parse?, TODO: maybe add msg about why if we can figure that out?
+
+
     @classmethod
     def is_on_move_list(cls, move, move_list):
         # Returns true if given move is on given move list
@@ -827,7 +906,7 @@ class GameController:
             human_player_side = 'w'
         # Initialize game and force normal starting position for now...
         game = Game()
-        game.set_board = Board() # defaults to normal starting position
+        game.set_board(Board()) # defaults to normal starting position
 
         print("Here is the starting position:")
         game.show_board()
