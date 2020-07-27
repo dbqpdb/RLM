@@ -787,12 +787,216 @@ class Move:
                 # Can now use piece character to help narrow down choices when there is ambiguity
                 if source_square is None:
                     # Have piece character but no source square, need to disambiguate using move list
-                    pass
+                    correct_piece_moves = [m for m in possible_legal_moves if m.char.upper()==piece_char.upper()]
+                    if len(correct_piece_moves)==0:
+                        move = None
+                        msg = "Your entered move, %s, omits the starting square. There appear to be no '%s' pieces which can legally move to %s, so we can't parse your move."%(entered_move, piece_char, dest_square)
+                    elif len(correct_piece_moves)==1:
+                        move = correct_piece_moves[0]
+                    else: # len>1
+                        move = None
+                        msg = "Your entered move, %s, omits the starting square.  There appear to be multiple '%s' pieces which can legally move to %s, so you need to provide more information to disambiguate!"%(entered_move, piece_char, dest_square)
+                else: # Piece char and source square are both not None
+                    if len(source_square)==2:
+                        # source square is fully specified, as well as piece and destination square should be ready to 
+                        pass
+
              
 
         
   
         return move, msg # None if couldn't parse?, TODO: maybe add msg about why if we can figure that out?
+    # important test case: Rb1xb5 (meaning Rook takes piece on b5, but might be read as Rb1 takes a bishop (xb) but then unable to parse the destination square)
+    #move_tuple = (
+    # self.single_char, # could assume pawn if not specified and no game or move list
+    # self.starting_square, # if unspec or partially spec, can't guess w/o game or legal move list
+    # self.destination_square, # can't guess w/o game or legal move list 
+    # self.captured_piece, # can't tell unless capture indicator and piece specified with capture indicator
+    # self.is_castling, # obvious from entered move, it's either castling or not
+    # self.promotion_piece, # if dest square is not on first or last rank, then None, If single_char is not P or p, then None.  Otherwise, can't be guessed at all, must be specified
+    # self.is_en_passant_capture,  # can be filled in if ep capture indicator is given, otherwise assume false
+    # self.new_en_passant_square)  # can be filled in if source and dest square given and 
+
+    @classmethod
+    def parse_alone(cls, entered_move, side_to_move='w'):
+        # Report best guess move and possible errors
+        kingside_castling_patt = re.compile(r"^\s*([oO0])-\1\s*")
+        queenside_castling_patt = re.compile(r"^\s*([oO0])-\1-\1\s*")
+        no_dest_capture_patt = re.compile(r"""
+            ^\s*
+            (?P<moving_piece>[KQRBNPkqrbnp]) # pieces which can capture
+            x
+            (?P<captured_piece>[QRBNPqrbnp]) # pieces which can be captured
+            [+]? # check indicator (optional and ignored)
+            \s*$
+            """, re.VERBOSE) # Matches moves like RxB with no square information
+        normal_move_patt = re.compile(r"""
+            \s*                             # ignore any leading whitespace
+            (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
+            (?P<source_square>[a-h]?[1-8])? # any elements of the source square, if present
+            (?P<capture_indicator>x[QRBNqrbn]?)?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
+            (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
+            ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
+              (?P<promotion_piece>[QRBNqrbn]) # promotion piece character
+            )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)
+            (?P<ep_capture_indicator>e[.]?p[.]?) # optional ep or e.p. to indicate en passant capture (always optional but could use to catch user errors)
+            [+]? # check indicator (optional and ignored)      
+            \s*$                            # Ignore any trailing whitespace
+            """, re.VERBOSE)
+
+        known = []
+        unknown = ['single_char','starting_square','destination_square','captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square']
+        def make_known(s):
+            # move string 's' from unknown to known
+            unknown.remove(s)
+            known.append(s)
+        
+        # Queenside castling (queenside first because kingside pattern will match queenside castling)
+        if queenside_castling_patt.match(entered_move):
+            # Queenside castling
+            is_castling = True
+            captured_piece = None
+            promotion_piece = None
+            is_en_passant_capture = False
+            new_en_passant_square = None
+            [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
+            if side_to_move == 'w':
+                [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+                move = Move('K','e1', 'c1', is_castling=True)
+                single_char = 'K'
+                starting_square = 'e1'
+                destination_square = 'c1'
+            elif side_to_move == 'b':
+                move = Move('k','e8', 'c8', is_castling=True)
+                [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+                single_char = 'k'
+                starting_square = 'e8'
+                destination_square = 'c8'
+            elif side_to_move is None:
+                move = None
+                msg = "Move parses as queenside castling, but it is impossible to guess which side is moving!"
+        # Kingside castling
+        elif kingside_castling_patt.match(entered_move):
+            is_castling = True
+            captured_piece = None
+            promotion_piece = None
+            is_en_passant_capture = False
+            new_en_passant_square = None
+            [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
+            if side_to_move == 'w':
+                move = Move('K', 'e1', 'g1', is_castling=True)
+                [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+                single_char = 'K'
+                starting_square = 'e1'
+                destination_square = 'g1'
+            elif side_to_move == 'b':
+                move = Move('k', 'e8', 'g8', is_castling=True)
+                [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+                single_char = 'k'
+                starting_square = 'e8'
+                destination_square = 'g8'
+            elif side_to_move is None:
+                move = None
+                msg = "Move parses as kingside castling, but it is impossible to guess which side was moving!"
+        elif no_dest_capture_patt.match(entered_move):
+            # can tell moving piece, captured piece, and know that new_en_passant_square should be None
+            [make_known(s) for s in ['single_char', 'captured_piece','new_en_passant_square','is_castling'] ]
+            m = no_dest_capture_patt.match(entered_move)
+            single_char = m.group('moving_piece')
+            captured_piece = m.group('captured_piece')
+            new_en_passant_square = None # a capture cannot generate a new ep square
+            is_castling = False
+            if single_char.lower()!='p' or captured_piece.lower()!='p':
+                make_known('is_en_passant_capture')
+                is_en_passant_capture = False
+            if single_char.lower()!='p':
+                promotion_piece = None # non-pawns can't promote
+                make_known('promotion_piece')
+            elif captured_piece.lower()=='p':
+                promotion_piece = None # if you captured a pawn you can't be promoting, because an enemy pawn can't be on the final rank
+                make_known('promotion_piece')
+        elif normal_move_patt.match(entered_move):
+            is_castling = False
+            make_known('is_castling')
+            m = normal_move_patt.match(entered_move)
+            destination_square = m.group('dest_square') # this is the only non-optional part of the match, this must be present if we are in this branch
+            make_known('destination_square')
+            single_char = m.group('piece_char') # may be None
+            starting_square = m.group('source_square') # may be partial or None
+            capture_indicator = m.group('capture_indicator') # may be x or x<piece> or None
+            promotion_indicator = m.group('promotion_indicator')
+            promotion_piece = m.group('promotion_piece') # may be None
+            ep_capture_indicator = m.group('ep_capture_indicator') # may be None
+            
+            # Piece_char?
+            if single_char is None:
+                # Assume pawn ?
+                single_char = 'P'
+                msg += 'assumed "P" for missing piece character\n'
+            make_known('single_char') # could have case problems?
+            if starting_square is not None:
+                if len(starting_square)==2:
+                    make_known('starting_square')
+                else:
+                    msg += 'have only partial knowledge of starting square\n'
+            # Captured piece?
+            if capture_indicator is not None:
+                if  len(capture_indicator)==2:
+                    captured_piece = capture_indicator[1]
+                    make_known('captured_piece') 
+                else:
+                    msg += 'we know there was a capture (captured piece not None), but not what piece was captured\n'
+            # Promotion piece?
+            if single_char.lower() is not 'p':
+                make_known('promotion_piece')
+                promotion_piece = None # non-pawns can't promote
+            elif single_char[1] != '8' and single_char[1] !='1':
+                # pawns not on rank 1 or 8 can't be promoting
+                make_known('promotion_piece')
+                promotion_piece = None
+            else:
+                # pawn moving to last rank, must involve promotion!
+                if promotion_piece is not None:
+                    make_known('promotion_piece')
+                else:
+                    msg += "promotion_piece is not None, but we don't know what it should be\n"
+            # E.P. Capture? and/or New EP Square?
+            if single_char.lower() is not 'p':
+                # non-pawn move
+                is_en_passant_capture = False # can't be ep capture if moving piece is not a pawn
+                make_known('is_en_passant_capture')
+                new_en_passant_square = None # non-pawn moves can't create ep squares
+                make_known('new_en_passant_square')
+            else:
+                # moving piece IS a pawn
+                if ep_capture_indicator is not None:
+                    is_en_passant_capture = True # if moving piece is a pawn 
+                    make_known('is_en_passant_capture')
+                    if capture_indicator is not None and len(capture_indicator)==2:
+                        # captured piece already assigned and marked known
+                        pass
+                    else:
+                        captured_piece = 'P' # case?!?
+                        make_known('captured_piece')
+                    new_en_passant_square = None # ep captures can't create new ep squares
+                    make_known('new_en_passant_square') 
+                # Otherwise, the only way to know an ep square creation state is to know the moving piece and the starting and destination squares
+                if starting_square is not None and len(starting_square)==2:
+                    if starting_square[1]=='2' and destination_square[1]=='4':
+                        new_en_passant_square = destination_square[0]+'3'
+                    elif starting_square[1]=='7' and destination_square[1]=='5':
+                        new_en_passant_square = destination_square[0]+'6'
+                    else:
+                        new_en_passant_square = None
+                    make_known('new_en_passant_square')
+        # Conditional tree traversed, let's take a look at the results
+        print(known)
+        print(unknown)
+            
+                
+
+            
+            
 
 
     @classmethod
@@ -1868,3 +2072,185 @@ if __name__ == '__main__':
     run_me_if_i_am_the_main_file()
 else:
     run_him_if_i_am_not_the_main_file()
+
+
+def parse_alone(entered_move, side_to_move='w'):
+    # Report best guess move and possible errors
+    kingside_castling_patt = re.compile(r"^\s*([oO0])-\1\s*")
+    queenside_castling_patt = re.compile(r"^\s*([oO0])-\1-\1\s*")
+    no_dest_capture_patt = re.compile(r"""
+        ^\s*
+        (?P<moving_piece>[KQRBNPkqrbnp]) # pieces which can capture
+        x
+        (?P<captured_piece>[QRBNPqrbnp]) # pieces which can be captured
+        [+]? # check indicator (optional and ignored)
+        \s*$
+        """, re.VERBOSE) # Matches moves like RxB with no square information
+    normal_move_patt = re.compile(r"""
+        \s*                             # ignore any leading whitespace
+        (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
+        (?P<source_square>[a-h]?[1-8]?)? # any elements of the source square, if present
+        (?P<capture_indicator>[xX][QRBNqrbn]?)?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
+        (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
+        ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
+            (?P<promotion_piece>[QRBNqrbn]) # promotion piece character
+        )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)
+        (?P<ep_capture_indicator>e[.]?p[.]?)? # optional ep or e.p. to indicate en passant capture (always optional but could use to catch user errors)
+        [+]? # check indicator (optional and ignored)      
+        \s*$                            # Ignore any trailing whitespace
+        """, re.VERBOSE)
+
+    known = []
+    unknown = ['single_char','starting_square','destination_square','captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square']
+    def make_known(s):
+        # move string 's' from unknown to known
+        unknown.remove(s)
+        known.append(s)
+    msg = 'Other Messages:\n'
+    # Queenside castling (queenside first because kingside pattern will match queenside castling)
+    if queenside_castling_patt.match(entered_move):
+        # Queenside castling
+        is_castling = True
+        captured_piece = None
+        promotion_piece = None
+        is_en_passant_capture = False
+        new_en_passant_square = None
+        [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
+        if side_to_move == 'w':
+            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            move = Move('K','e1', 'c1', is_castling=True)
+            single_char = 'K'
+            starting_square = 'e1'
+            destination_square = 'c1'
+        elif side_to_move == 'b':
+            move = Move('k','e8', 'c8', is_castling=True)
+            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            single_char = 'k'
+            starting_square = 'e8'
+            destination_square = 'c8'
+        elif side_to_move is None:
+            move = None
+            msg += "Move parses as queenside castling, but it is impossible to guess which side is moving!\n"
+    # Kingside castling
+    elif kingside_castling_patt.match(entered_move):
+        is_castling = True
+        captured_piece = None
+        promotion_piece = None
+        is_en_passant_capture = False
+        new_en_passant_square = None
+        [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
+        if side_to_move == 'w':
+            move = Move('K', 'e1', 'g1', is_castling=True)
+            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            single_char = 'K'
+            starting_square = 'e1'
+            destination_square = 'g1'
+        elif side_to_move == 'b':
+            move = Move('k', 'e8', 'g8', is_castling=True)
+            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            single_char = 'k'
+            starting_square = 'e8'
+            destination_square = 'g8'
+        elif side_to_move is None:
+            move = None
+            msg += "Move parses as kingside castling, but it is impossible to guess which side was moving!\n"
+    elif no_dest_capture_patt.match(entered_move):
+        # can tell moving piece, captured piece, and know that new_en_passant_square should be None
+        [make_known(s) for s in ['single_char', 'captured_piece','new_en_passant_square','is_castling'] ]
+        m = no_dest_capture_patt.match(entered_move)
+        single_char = m.group('moving_piece')
+        captured_piece = m.group('captured_piece')
+        new_en_passant_square = None # a capture cannot generate a new ep square
+        is_castling = False
+        if single_char.lower()!='p' or captured_piece.lower()!='p':
+            make_known('is_en_passant_capture')
+            is_en_passant_capture = False
+        if single_char.lower()!='p':
+            promotion_piece = None # non-pawns can't promote
+            make_known('promotion_piece')
+        elif captured_piece.lower()=='p':
+            promotion_piece = None # if you captured a pawn you can't be promoting, because an enemy pawn can't be on the final rank
+            make_known('promotion_piece')
+    elif normal_move_patt.match(entered_move):
+        is_castling = False
+        make_known('is_castling')
+        m = normal_move_patt.match(entered_move)
+        destination_square = m.group('dest_square') # this is the only non-optional part of the match, this must be present if we are in this branch
+        make_known('destination_square')
+        single_char = m.group('piece_char') # may be None
+        starting_square = m.group('source_square') # may be partial or '' (can't be None anymore because always matches at least as '')
+        capture_indicator = m.group('capture_indicator') # may be x or x<piece> or None
+        promotion_indicator = m.group('promotion_indicator')
+        promotion_piece = m.group('promotion_piece') # may be None
+        ep_capture_indicator = m.group('ep_capture_indicator') # may be None
+        
+        # Piece_char?
+        if single_char is None:
+            # Assume pawn ?
+            single_char = 'P'
+            msg += 'assumed "P" for missing piece character\n'
+        make_known('single_char') # could have case problems?
+        if starting_square != '':
+            if len(starting_square)==2:
+                make_known('starting_square')
+            else:
+                msg += 'have only partial knowledge of starting square\n'
+        # Captured piece?
+        if capture_indicator is not None:
+            if  len(capture_indicator)==2:
+                captured_piece = capture_indicator[1]
+                make_known('captured_piece') 
+            else:
+                msg += 'we know there was a capture (captured piece not None), but not what piece was captured\n'
+        # Promotion piece?
+        if single_char.lower() is not 'p':
+            make_known('promotion_piece')
+            promotion_piece = None # non-pawns can't promote
+        elif single_char[1] != '8' and single_char[1] !='1':
+            # pawns not on rank 1 or 8 can't be promoting
+            make_known('promotion_piece')
+            promotion_piece = None
+        else:
+            # pawn moving to last rank, must involve promotion!
+            if promotion_piece is not None:
+                make_known('promotion_piece')
+            else:
+                msg += "promotion_piece is not None, but we don't know what it should be\n"
+        # E.P. Capture? and/or New EP Square?
+        if single_char.lower() is not 'p':
+            # non-pawn move
+            is_en_passant_capture = False # can't be ep capture if moving piece is not a pawn
+            make_known('is_en_passant_capture')
+            new_en_passant_square = None # non-pawn moves can't create ep squares
+            make_known('new_en_passant_square')
+        else:
+            # moving piece IS a pawn
+            if ep_capture_indicator is not None:
+                is_en_passant_capture = True # if moving piece is a pawn 
+                make_known('is_en_passant_capture')
+                if capture_indicator is not None and len(capture_indicator)==2:
+                    # captured piece already assigned and marked known
+                    pass
+                else:
+                    captured_piece = 'P' # case?!?
+                    make_known('captured_piece')
+                new_en_passant_square = None # ep captures can't create new ep squares
+                make_known('new_en_passant_square') 
+            # Otherwise, the only way to know an ep square creation state is to know the moving piece and the starting and destination squares
+            if starting_square is not None and len(starting_square)==2:
+                if starting_square[1]=='2' and destination_square[1]=='4':
+                    new_en_passant_square = destination_square[0]+'3'
+                elif starting_square[1]=='7' and destination_square[1]=='5':
+                    new_en_passant_square = destination_square[0]+'6'
+                else:
+                    new_en_passant_square = None
+                make_known('new_en_passant_square')
+    # Conditional tree traversed, let's take a look at the results
+    print("Known Move Elements:")
+    for k in known:
+        val = eval(k)
+        if val is None:
+            val = 'None'
+        print("%s: %s"%(k,val))
+    print("Unknown Move Elements: %s" % (str(unknown)))
+    print(msg)
