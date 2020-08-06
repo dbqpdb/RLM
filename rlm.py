@@ -2074,7 +2074,7 @@ else:
     run_him_if_i_am_not_the_main_file()
 
 
-def parse_alone(entered_move, side_to_move='w'):
+def parse_alone(entered_move, side_to_move='w', make_assumptions=False):
     # Report best guess move and possible errors
     kingside_castling_patt = re.compile(r"^\s*([oO0])-\1\s*")
     queenside_castling_patt = re.compile(r"^\s*([oO0])-\1-\1\s*")
@@ -2089,7 +2089,7 @@ def parse_alone(entered_move, side_to_move='w'):
     normal_move_patt = re.compile(r"""
         \s*                             # ignore any leading whitespace
         (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
-        (?P<source_square>[a-h]?[1-8]?)? # any elements of the source square, if present
+        (?P<starting_file>[a-h])?(?P<starting_rank>[1-8])? # any elements of the source square, if present
         (?P<capture_indicator>[xX][QRBNqrbn]?)?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
         (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
         ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
@@ -2101,7 +2101,7 @@ def parse_alone(entered_move, side_to_move='w'):
         """, re.VERBOSE)
 
     known = []
-    unknown = ['single_char','starting_square','destination_square','captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square']
+    unknown = ['single_char','starting_file', 'starting_rank','destination_square','captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square']
     def make_known(s):
         # move string 's' from unknown to known
         unknown.remove(s)
@@ -2117,16 +2117,18 @@ def parse_alone(entered_move, side_to_move='w'):
         new_en_passant_square = None
         [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
         if side_to_move == 'w':
-            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            [make_known(s) for s in ['single_char', 'starting_file', 'starting_rank','destination_square'] ]
             move = Move('K','e1', 'c1', is_castling=True)
             single_char = 'K'
-            starting_square = 'e1'
+            starting_file = 'e'
+            starting_rank = '1'
             destination_square = 'c1'
         elif side_to_move == 'b':
             move = Move('k','e8', 'c8', is_castling=True)
-            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            [make_known(s) for s in ['single_char', 'starting_file', 'starting_rank','destination_square'] ]
             single_char = 'k'
-            starting_square = 'e8'
+            starting_file = 'e'
+            starting_rank = '8'
             destination_square = 'c8'
         elif side_to_move is None:
             move = None
@@ -2141,15 +2143,17 @@ def parse_alone(entered_move, side_to_move='w'):
         [make_known(s) for s in ['captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square'] ]
         if side_to_move == 'w':
             move = Move('K', 'e1', 'g1', is_castling=True)
-            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            [make_known(s) for s in ['single_char', 'starting_file', 'starting_rank','destination_square'] ]
             single_char = 'K'
-            starting_square = 'e1'
+            starting_file = 'e'
+            starting_rank = '1'
             destination_square = 'g1'
         elif side_to_move == 'b':
             move = Move('k', 'e8', 'g8', is_castling=True)
-            [make_known(s) for s in ['single_char','starting_square','destination_square'] ]
+            [make_known(s) for s in ['single_char', 'starting_file', 'starting_rank','destination_square'] ]
             single_char = 'k'
-            starting_square = 'e8'
+            starting_file = 'e'
+            starting_rank = '8'
             destination_square = 'g8'
         elif side_to_move is None:
             move = None
@@ -2178,23 +2182,24 @@ def parse_alone(entered_move, side_to_move='w'):
         destination_square = m.group('dest_square') # this is the only non-optional part of the match, this must be present if we are in this branch
         make_known('destination_square')
         single_char = m.group('piece_char') # may be None
-        starting_square = m.group('source_square') # may be partial or '' (can't be None anymore because always matches at least as '')
+        starting_rank = m.group('starting_rank') # may be None
+        if starting_rank is not None:
+            make_known('starting_rank')
+        starting_file = m.group('starting_file') # may be None
+        if starting_file is not None:
+            make_known('starting_file')
         capture_indicator = m.group('capture_indicator') # may be x or x<piece> or None
         promotion_indicator = m.group('promotion_indicator')
         promotion_piece = m.group('promotion_piece') # may be None
         ep_capture_indicator = m.group('ep_capture_indicator') # may be None
         
         # Piece_char?
-        if single_char is None:
-            # Assume pawn ?
+        if single_char is None and make_assumptions:
+            # Assume pawn 
             single_char = 'P'
             msg += 'assumed "P" for missing piece character\n'
-        make_known('single_char') # could have case problems?
-        if starting_square != '':
-            if len(starting_square)==2:
-                make_known('starting_square')
-            else:
-                msg += 'have only partial knowledge of starting square\n'
+        if single_char is not None:
+            make_known('single_char') # could have case problems?
         # Captured piece?
         if capture_indicator is not None:
             if  len(capture_indicator)==2:
@@ -2203,27 +2208,38 @@ def parse_alone(entered_move, side_to_move='w'):
             else:
                 msg += 'we know there was a capture (captured piece not None), but not what piece was captured\n'
         # Promotion piece?
-        if single_char.lower() is not 'p':
+        if single_char and single_char.lower() != 'p':
+            # if piece is known and not a pawn, can't be promotion
             make_known('promotion_piece')
             promotion_piece = None # non-pawns can't promote
-        elif single_char[1] != '8' and single_char[1] !='1':
-            # pawns not on rank 1 or 8 can't be promoting
+        elif destination_square[1] != '8' and destination_square[1] !='1':
+            # no matter what the piece (known or unknown), if not going to rank 1 or 8 can't be promoting
             make_known('promotion_piece')
             promotion_piece = None
-        else:
+        elif single_char and single_char.lower() == 'p':
             # pawn moving to last rank, must involve promotion!
             if promotion_piece is not None:
                 make_known('promotion_piece')
             else:
                 msg += "promotion_piece is not None, but we don't know what it should be\n"
+        else:
+            # single_char is None, and destination_square is on first or last rank
+            # Promotion state is unknown, could be a pawn promoting or could be a non-pawn not promoting.
+            # However, if the user specified a promotion piece, then safe to assume unspecified piece is 
+            # a pawn and that promotion is taking place. Otherwise don't assume either way
+            if promotion_piece is not None:
+                make_known('promotion_piece')
+                single_char = 'p'
+                make_known('single_char')
+                
         # E.P. Capture? and/or New EP Square?
-        if single_char.lower() is not 'p':
-            # non-pawn move
+        if single_char and single_char.lower() != 'p':
+            # non-pawn moving piece
             is_en_passant_capture = False # can't be ep capture if moving piece is not a pawn
             make_known('is_en_passant_capture')
             new_en_passant_square = None # non-pawn moves can't create ep squares
             make_known('new_en_passant_square')
-        else:
+        elif single_char and single_char.lower() == 'p':
             # moving piece IS a pawn
             if ep_capture_indicator is not None:
                 is_en_passant_capture = True # if moving piece is a pawn 
@@ -2237,14 +2253,38 @@ def parse_alone(entered_move, side_to_move='w'):
                 new_en_passant_square = None # ep captures can't create new ep squares
                 make_known('new_en_passant_square') 
             # Otherwise, the only way to know an ep square creation state is to know the moving piece and the starting and destination squares
-            if starting_square is not None and len(starting_square)==2:
-                if starting_square[1]=='2' and destination_square[1]=='4':
+            if starting_file is not None and starting_rank is not None:
+                if starting_rank=='2' and destination_square[1]=='4':
                     new_en_passant_square = destination_square[0]+'3'
-                elif starting_square[1]=='7' and destination_square[1]=='5':
+                elif starting_rank=='7' and destination_square[1]=='5':
                     new_en_passant_square = destination_square[0]+'6'
                 else:
                     new_en_passant_square = None
                 make_known('new_en_passant_square')
+        else:
+            # Moving piece is unknown, might be a pawn, might not
+            # However, if the destination square is not on the proper rank, it
+            # cannot possibly be an ep capture
+            if (side_to_move=='w' and destination_square[1] != '6') or (side_to_move=='b' and destination_square[1] != '3'):
+                is_en_passant_capture = False
+                make_known('is_en_passant_capture')
+            elif starting_rank and ((side_to_move=='w' and starting_rank != '5') or (side_to_move=='b' and starting_rank != '4')):
+                # Even if destination rank is correct for ep capture, we can still rule it out if the starting rank 
+                # is not correct for possible ep capture
+                is_en_passant_capture = False
+                make_known('is_en_passant_capture')
+
+            # Likewise, if the destination square is not on the proper rank, it
+            # cannot possibly create a new ep square
+            if (side_to_move=='w' and destination_square[1] !='4') or (side_to_move=='b' and destination_square[1] != '5'):
+                new_en_passant_square = None
+                make_known('new_en_passant_square')
+            elif starting_rank and ((side_to_move=='w' and starting_rank != '2') or (side_to_move=='b' and starting_rank !='7')):
+                # Even if destination square is the right rank, if the starting square isn't the right rank, then 
+                # it is impossible to generate a new ep square
+                new_en_passant_square = None
+                make_known('new_en_passant_square')
+
     # Conditional tree traversed, let's take a look at the results
     print("Known Move Elements:")
     for k in known:
