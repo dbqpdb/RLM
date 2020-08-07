@@ -765,7 +765,8 @@ class Move:
         # TODO: could add reason_dict with move element keys and reasons as values (i.e. "because only pawns can promote", or "because castling can't cause captures")
         return move_elem_dict
 
-    def find_matches_to_partial_move(self, partial_move_dict, move_list):
+    @classmethod
+    def find_matches_to_partial_move(cls, partial_move_dict, move_list):
         ''' Find all possible matches where every known or partially known element of partial_move_dict 
         is consistent with a Move object on the given move_list. partial_move_dict should be the 
         output of parse_move_without_game().  
@@ -1121,16 +1122,29 @@ class HumanPlayer (Player):
     '''
     def choose_move(self, game, legal_moves_list):
         '''Prompt the human player to enter a move'''
-        entered_move = input("What is your move?\nEnter move: ") # TODO make this better
-        # Convert entered move to Move object
-        move = Move.parse_entered_move(entered_move)
-        # Validate by checking if this move is on the legal_moves_list
-        while not Move.is_on_move_list(move, move_list=legal_moves_list):
-            entered_move = input("That wasn't valid, try again!!\nEnter move: ") # TODO make this way better (change level of response, be more helpful, etc.)
-            move = Move.parse_entered_move(entered_move)
+        valid_move_entered = False
+        while not valid_move_entered:
+            entered_move = input("What is your move?\nEnter move: ") # TODO make this better
+            # Convert entered move to Move object
+            partial_move_dict = Move.parse_move_without_game(entered_move, white_is_moving=(game.side_to_move=='w'))
+            matching_moves = Move.find_matches_to_partial_move(partial_move_dict, legal_moves_list)
+            if len(matching_moves)==1:
+                move = matching_moves[0]
+                valid_move_entered = True
+                msg = 'Your move is %s, got it!'%(move.to_long_algebraic())
+            elif len(matching_moves)==0:
+                msg = 'Your entered move did not match any legal moves... try again!\n'
+                # TODO this can be much improved!!  We could identify the move with the closest match, ask them if they 
+                # meant that, we can explain what move elements could not be matched, etc. 
+            else:
+                # More than 1 legal move matched all the information they supplied, let's offer them a choice...
+                move_str_list = [m.to_long_algebraic() for m in matching_moves]
+                msg = 'Your entered move was consistent with %i legal moves, one of the following would be less ambiguous:\n'
+                for m in move_str_list:
+                    msg += m + '\n'
+                msg += 'Try again!\n'
+            print(msg)
         return move
-    
-
     
 
 class NRLMPlayer (Player):
@@ -1160,44 +1174,57 @@ class GameController:
         start_game_answer = input('Hey there, do you want to play a game of chess?\n(Y/n): ')
         if len(start_game_answer)>0 and start_game_answer[0].lower()=='n':
             print("Fine!! I'll play myself then!! You can watch.")
-            return
-        # Choose colors
-        side_answer = input('Would you like to play as white or black?\n(W/b): ')
-        if len(side_answer)>0 and side_answer[0].lower()=='b':
-            print("OK, I'll play as white!")
-            rlm_player_side = 'w'
-            human_player_side = 'b'
-        else:
-            print("OK, I'll play as black!")
-            rlm_player_side = 'b'
-            human_player_side = 'w'
+            white_player = RLMPlayer()
+            black_player = RLMPlayer()
+        else: 
+            # Choose colors
+            side_answer = input('Would you like to play as white or black?\n(W/b): ')
+            if len(side_answer)>0 and side_answer[0].lower()=='b':
+                print("OK, I'll play as white!")
+                white_player = RLMPlayer()
+                black_player = HumanPlayer()
+            else:
+                print("OK, I'll play as black!")
+                black_player = RLMPlayer()
+                white_player = HumanPlayer()
         # Initialize game and force normal starting position for now...
         game = Game()
         game.set_board(Board()) # defaults to normal starting position
+        game.set_players(white_player, black_player)
 
         print("Here is the starting position:")
         game.show_board()
 
         # The game loop
         game_is_over = False
+        legal_moves = game.get_moves_for()
         while not game_is_over:
-            if game.side_to_move[0] == rlm_player_side:
-                # RLM needs to pick a move
-                legal_moves = game.get_moves_for()
+            if game.side_to_move[0] == 'w':
+                move = white_player.choose_move(game, legal_moves)
+            else:
+                move = black_player.choose_move(game, legal_moves)
+            # Carry out chosen move and update game
+            game.make_move(move)
+            #TODO: record move history here
+            game.show_board()
+            # To see if game is over, check if there are legal moves (if there aren't any, it's either stalemate or checkmate)
+            legal_moves = game.get_moves_for()
+            if len(legal_moves)==0:
+                game_is_over = True # checkmate or stalemate
+                # Need to find if the side to move's king is currently in check
+                if game.side_to_move=='w':
+                    K = [p for p in game.white_pieces if isinstance(p, King)][0]
+                    game_over_msg = 'CHECKMATE!! Black wins!' if K.is_in_check() else "STALEMATE!!  It's a draw!"
+                else:
+                    k = [p for p in game.black_pieces if isinstance(p, King)][0]
+                    game_over_msg = 'CHECKMATE!! White wins!' if k.is_in_check() else "STALEMATE!!  It's a draw!"
+            elif game.half_moves_since >= 100: # TODO: check if this should be > or >=
+                game_is_over = True
+                game_over_msg = "DRAW!! That's 50 moves with no captures or pawn moves!"
 
-            elif game.side_to_move[0] == human_player_side:
-                # Human player needs to enter a move
-                # Prompt
-                # Parse/Validate
-                pass
-            else: 
-                raise Exception("Something has gone wrong, game.side_to_move doesn't appear to correspond to a RLM player or a human player...")
-
-            # Check if the game is over
-            # * checkmate or stalemate
-            # * 50 moves w/o capture or pawn move
-
-        # Get here at game end...
+        # The game has ended...
+        print(game_over_msg)
+        print("Thanks for playing!")
 
 
 
@@ -1217,6 +1244,8 @@ class Game:
         self.white_pieces = []
         self.black_pieces = []
         self.board = None # This needs to be initialized before we can really play a game, but let's start with a placeholder which indicates it's not initialized
+        self.white_player = None
+        self.black_player = None
 
 
     def copy(self):
@@ -1227,6 +1256,7 @@ class Game:
         game_copy.white_pieces = self.white_pieces
         game_copy.black_pieces = self.black_pieces
         game_copy.board = self.board.copy() # make a copy of the board, don't reference same board
+        # NOTE: Any need to copy Players? (not yet, but consider)
         return game_copy
 
 
@@ -1234,14 +1264,16 @@ class Game:
         self.board = board
         self.initialize_pieces_from_board(board)
 
+    def set_players(self, white_player, black_player):
+        self.white_player = white_player
+        self.black_player = black_player
+
     def show_board(self):
         '''Print board string (could also be configured to call a graphical displayer once we've worked that out)'''
         print(self.board)
 
-    def make_move(self, move, change_side_to_move=True):
-        '''Update board and pieces based on move.  change_side_to_move flag determines
-        whether the side_to_move is changed (default) or remains in current state, which
-        is desirable for imagined moves.  
+    def make_move(self, move):
+        '''Update board, pieces, and game state based on move.  
         NOTE that this updates the game's Board object and replaces the Piece objects
         This may need to be changed in the future if piece objects got more complex and
         were storing something like a move history, or anything like that. '''
@@ -1266,7 +1298,7 @@ class Game:
             else:
                 raise Exception("Move said it was castling move, but didn't move to g or c file, instead moved to '%s'" % board.square_to_alg_name(dest_sq) )
             # Also need to update castling options (no longer allowed, can't castle twice)
-            if move.char=='K': # white
+            if move.single_char=='K': # white
                 self.set_castling_state('K', False)
                 self.set_castling_state('Q', False)
             else:
@@ -1275,23 +1307,41 @@ class Game:
         elif move.is_en_passant_capture:
             # Also need to remove captured pawn from board
             board[move.destination_square[0], move.starting_square[1]] = Board.EMPTY_SQUARE
+        # Moving the king invalidates castling on both sides
+        elif move.single_char=='K':
+            self.set_castling_state('K', False)
+            self.set_castling_state('Q', False)
+        elif move.single_char=='k':
+            self.set_castling_state('k', False)
+            self.set_castling_state('q', False)
+        # Moving a rook off it's starting square disables castling on that side
+        elif move.single_char=='R':
+            if board.is_same_square(move.starting_square, 'h1'):
+                self.set_castling_state('K', False)
+            elif board.is_same_square(move.starting_square, 'a1'):
+                self.set_castling_state('Q', False)
+        elif move.single_char=='r':
+            if board.is_same_square(move.starting_square, 'h8'):
+                self.set_castling_state('k', False)
+            elif board.is_same_square(move.starting_square, 'a8'):
+                self.set_castling_state('q', False)
 
         # Update the game list of pieces from the updated board (existing pieces are discarded)
         self.initialize_pieces_from_board(board) # this makes the board the master representation
 
         # There are several housekeeping things we only really need to do if this is a real move (rather than imagined)
         # This is indicated by the change_side_to_move flag: if true, this is a real move, if not, it's imagined
-        if change_side_to_move:
-            self.move_counter = self.move_counter+1 if self.side_to_move == 'b' else self.move_counter # increment if black just moved
-            if move.captured_piece is not None or move.char.upper()=='P':
-                # reset if capture or pawn move
-                self.half_moves_since = 0
-            else:
-                self.half_moves_since += 1
-            # Change side to move
-            self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
-            # Update game ep square
-            self.ep_square = move.new_en_passant_square
+        #if change_side_to_move:
+        self.move_counter = self.move_counter+1 if self.side_to_move == 'b' else self.move_counter # increment if black just moved
+        if move.captured_piece is not None or move.single_char.upper()=='P':
+            # reset if capture or pawn move
+            self.half_moves_since = 0
+        else:
+            self.half_moves_since += 1
+        # Change side to move
+        self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
+        # Update game ep square
+        self.ep_square = move.new_en_passant_square
 
   
     def set_white_to_move(self):
@@ -1672,8 +1722,8 @@ class King (KQRBN_Piece):
         resulting board position. Should be careful to not to alter the game board position
         permanently, this is an imagined move, not yet an actual move.'''
         temp_game = self.game.copy() # make a copy of the game to imagine move
-        temp_game.make_move(move, change_side_to_move=False)
-        other_side_moves = temp_game.get_moves_for(other_side=True, allow_own_king_checked=True)
+        temp_game.make_move(move) # make the move in the game copy
+        other_side_moves = temp_game.get_moves_for(allow_own_king_checked=True)
         other_side_dest_squares = [move.destination_square for move in other_side_moves]
         for other_side_dest in other_side_dest_squares:
             if temp_game.board[other_side_dest]==self.char:
