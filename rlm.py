@@ -1076,6 +1076,9 @@ class Game:
                 self.set_castling_state('k', False)
             elif board.is_same_square(move.starting_square, 'a8'):
                 self.set_castling_state('q', False)
+        # Handle pawn promotion
+        elif move.promotion_piece is not None:
+            board[move.destination_square] = move.promotion_piece.upper() if move.single_char==move.single_char.upper() else move.promotion_piece.lower() # assure case is correct (matches original pawn case)
 
         # Update the game list of pieces from the updated board (existing pieces are discarded)
         self.initialize_pieces_from_board(board) # this makes the board the master representation
