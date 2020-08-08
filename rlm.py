@@ -9,7 +9,7 @@ versionNumber = 0.20 # legal move generation may be working!
 import numpy as np
 import re
 import sys
-from random import *
+import random
 import time
 import gzip
 import pandas as pd
@@ -221,8 +221,8 @@ class Board:
 
     @classmethod
     def square_rank_str(cls, square_idxs):
-        # Returns the rank number as a single character string
-        return str(int(square_idxs[1]))
+        # Returns the rank number as a single character string (one-based, not zero-based)
+        return str(int(square_idxs[1])+1)
 
     @classmethod
     def square_file_lett(cls, square_idxs):
@@ -777,7 +777,7 @@ class Move:
         matched_moves = []
         for move in move_list:
             # Check each field
-            if (pmd['single_char']==unk or (move.single_char == pmd['single_char'])
+            if (    (pmd['single_char']==unk or (move.single_char == pmd['single_char']))
                 and (pmd['starting_file']==unk or (Board.square_file_lett(move.starting_square) == pmd['starting_file']))
                 and (pmd['starting_rank']==unk or (Board.square_rank_str(move.starting_square) == pmd['starting_rank']))
                 and (pmd['destination_square']==unk or (Board.square_to_alg_name(move.destination_square) == pmd['destination_square']))
@@ -1115,7 +1115,9 @@ class RLMPlayer (Player):
     '''
     def choose_move(self, game, legal_moves_list):
         # RLM player generates the list of possible legal moves, and chooses a random one off the list
-        return random.choice(legal_moves_list)
+        chosen_move = random.choice(legal_moves_list)
+        print('RLM player played %s'%chosen_move.to_long_algebraic())
+        return chosen_move
 
 class HumanPlayer (Player):
     ''' Class to handle interaction with human player during a game (mostly requesting a move)
@@ -1139,7 +1141,7 @@ class HumanPlayer (Player):
             else:
                 # More than 1 legal move matched all the information they supplied, let's offer them a choice...
                 move_str_list = [m.to_long_algebraic() for m in matching_moves]
-                msg = 'Your entered move was consistent with %i legal moves, one of the following would be less ambiguous:\n'
+                msg = 'Your entered move was consistent with %i legal moves, one of the following would be less ambiguous:\n'%len(matching_moves)
                 for m in move_str_list:
                     msg += m + '\n'
                 msg += 'Try again!\n'
@@ -1205,7 +1207,7 @@ class GameController:
                 move = black_player.choose_move(game, legal_moves)
             # Carry out chosen move and update game
             game.make_move(move)
-            #TODO: record move history here
+            
             game.show_board()
             # To see if game is over, check if there are legal moves (if there aren't any, it's either stalemate or checkmate)
             legal_moves = game.get_moves_for()
@@ -1225,6 +1227,14 @@ class GameController:
         # The game has ended...
         print(game_over_msg)
         print("Thanks for playing!")
+        move_hist_ans = input("Shall I print the move history for this game?\n[Y/n]:")
+        if not (move_hist_ans and move_hist_ans[0].lower()=='n'):
+            # Print move history unless user indicates no
+            game.print_move_history()
+            
+            
+
+        
 
 
 
@@ -1246,17 +1256,19 @@ class Game:
         self.board = None # This needs to be initialized before we can really play a game, but let's start with a placeholder which indicates it's not initialized
         self.white_player = None
         self.black_player = None
+        self.move_history = []
 
 
     def copy(self):
         game_copy = Game()
         game_copy.ep_square = self.ep_square
-        game_copy.castling_state = self.castling_state
+        game_copy.castling_state = self.castling_state.copy()
         game_copy.side_to_move = self.side_to_move
-        game_copy.white_pieces = self.white_pieces
-        game_copy.black_pieces = self.black_pieces
+        game_copy.white_pieces = self.white_pieces.copy()
+        game_copy.black_pieces = self.black_pieces.copy()
         game_copy.board = self.board.copy() # make a copy of the board, don't reference same board
         # NOTE: Any need to copy Players? (not yet, but consider)
+        game_copy.move_history = self.move_history.copy()
         return game_copy
 
 
@@ -1271,6 +1283,18 @@ class Game:
     def show_board(self):
         '''Print board string (could also be configured to call a graphical displayer once we've worked that out)'''
         print(self.board)
+
+    def print_move_history(self):
+        # Should print the game's move history in approximately pgn format (i.e. "1. Pe2e4  Pc7c5\n 2. Pd2d4", etc)
+        hist_str = 'Move History:\n'
+        for idx, move in enumerate(self.move_history):
+            if idx % 2 == 0:
+                # odd move, white
+                hist_str += "%i. %s  "%((idx+1)/2, move.to_long_algebraic(use_figurine=True, note_ep=True))
+            else:
+                # even move, black
+                hist_str += "%s\n" % (move.to_long_algebraic(use_figurine=True, note_ep=True))
+        print(hist_str)
 
     def make_move(self, move):
         '''Update board, pieces, and game state based on move.  
@@ -1342,6 +1366,8 @@ class Game:
         self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
         # Update game ep square
         self.ep_square = move.new_en_passant_square
+        # Add move to move history
+        self.move_history.append(move)
 
   
     def set_white_to_move(self):
@@ -1632,7 +1658,7 @@ class King (KQRBN_Piece):
         if not allow_own_king_checked:
             kingside_allowed_by_state, queenside_allowed_by_state = self.game.get_castling_state(self.color) 
             kingside_allowed_by_position, queenside_allowed_by_position = self.get_castling_allowed_by_position() 
-            kingside_allowed_by_check, queenside_allowed_by_check = self.get_castling_allowed_by_check() # TODO: write this function
+            kingside_allowed_by_check, queenside_allowed_by_check = self.get_castling_allowed_by_check() 
 
             kingside_allowed = kingside_allowed_by_state and kingside_allowed_by_position and kingside_allowed_by_check
             queenside_allowed = queenside_allowed_by_state and queenside_allowed_by_position and queenside_allowed_by_check
@@ -1677,6 +1703,9 @@ class King (KQRBN_Piece):
                     queenside_allowed = True
                 else:
                     queenside_allowed = False
+            else: 
+                kingside_allowed = False
+                queenside_allowed = False
         else: # black
             if board['e8']=='k':
                 # Kingside
@@ -1688,6 +1717,9 @@ class King (KQRBN_Piece):
                     queenside_allowed = True
                 else:
                     queenside_allowed = False
+            else:
+                kingside_allowed = False
+                queenside_allowed = False
         return kingside_allowed, queenside_allowed
        
     def get_castling_allowed_by_check(self):
@@ -1846,8 +1878,16 @@ class Pawn (Piece):
                 # Moving forward one square
                 move_candidates.append( Move(self.char, self.current_square, forward_sq) )
 
-        if self.game.ep_square is not None:
+        if self.game.ep_square is not None and not allow_own_king_checked:
             ep_square = board.square_name_to_array_idxs(self.game.ep_square) #standardize
+            # NOTE: added condition that if allow_own_king_checked is True, then ignore any existing 
+            # e.p. square because if allow_own_king_checked is True, then that means that we are
+            # imagining moves for the non-moving side, whereas any ep square is going to be for the 
+            # moving side.  Therefore this was generating a bug where, for example, a white pawn was
+            # trying to capture another white pawn e.p., which is not an actual move.  This fix
+            # means that if an ep capture was going to be possible in some way, that would be missed.
+            # I don't think that's a problem, but if it is it will need to be solved in some way which 
+            # doesn't reintroduce this bug. 
         else:
             ep_square = None
         # Check diagonal moves for captures
@@ -1884,14 +1924,14 @@ class Pawn (Piece):
 
 
 def sillyDude():
-    dude = choice(['Mike', 'Bryan'])
+    dude = random.choice(['Mike', 'Bryan'])
     print("Is " + dude + " silly?:")
     def backline():        
         print(' ' * messagelen, end='')
         print('\r', end='')
 
     for __ in range(50):
-        compute = random()
+        compute = random.random()
         message = "Computing... " + str(compute)
         messagelen = len(message)
         time.sleep(compute/10)
@@ -1932,7 +1972,7 @@ class Lexicon:
         :param str pos: a part-of-speech labeled in the lexicon
         :return str bleh: a random word of the given POS
         '''
-        bleh = choice(self.lex[pos])
+        bleh = random.choice(self.lex[pos])
         return bleh
 
 
@@ -2125,6 +2165,10 @@ class TestRLM:
 
 
 def run_me_if_i_am_the_main_file():
+
+    # Try playing a game!
+    gc = GameController()
+    gc.start_new_game()
     
     # Run the test I'm working on right now!
     TestRLM().test_pawn_moves_1()
