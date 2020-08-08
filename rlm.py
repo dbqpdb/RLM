@@ -4,7 +4,7 @@
 # The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing 
 #
 # 
-versionNumber = 0.20 # legal move generation may be working!
+versionNumber = 0.40 # basic gameplay is now possible!
 
 import numpy as np
 import re
