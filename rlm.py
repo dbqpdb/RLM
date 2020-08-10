@@ -4,12 +4,12 @@
 # The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing 
 #
 # 
-versionNumber = 0.20 # legal move generation may be working!
+versionNumber = 0.40 # basic gameplay is now possible!
 
 import numpy as np
 import re
 import sys
-from random import *
+import random
 import time
 import gzip
 import pandas as pd
@@ -218,6 +218,18 @@ class Board:
             sq1 = cls.square_name_to_array_idxs(square_name_1)
             sq2 = cls.square_name_to_array_idxs(square_name_2)
             return sq1==sq2
+
+    @classmethod
+    def square_rank_str(cls, square_idxs):
+        # Returns the rank number as a single character string (one-based, not zero-based)
+        return str(int(square_idxs[1])+1)
+
+    @classmethod
+    def square_file_lett(cls, square_idxs):
+        # Returns the file letter as a single character string
+        file_idx = square_idxs[0]
+        file_lett = Board.IDX_TO_FILE_DICT[file_idx]
+        return file_lett
 
     def __str__(self):
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
@@ -534,6 +546,342 @@ class Move:
         rank_number = '%i'%(sq[1]+1)
         return file_letter+rank_number
 
+    @classmethod
+    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False):
+        ''' This function tries to extract as much information as possible from an entered move text string,
+        parsing it into move elements.  It keeps track of what move elements are known, what remain unknown,
+        and what have some partial information (e.g. a piece was captured, but it wasn't specified which).
+        The goal is to be able to use the extracted information to choose the correct, fully specified Move
+        from a list of legal Move objects generated from the Game state, AND to be able to explain why there
+        is no match if there is no match (or how the matches differ if there are multiple matches)
+        This function returns a dict with the following keys: 
+        ['single_char','starting_file', 'starting_rank','destination_square',
+        'captured_piece','is_castling','promotion_piece','is_en_passant_capture',
+        'new_en_passant_square']
+        The values will be either "unknown" if the move element cannot be determined from the entered move,
+        or "not_None" if the move element was determined to be not None but couldn't be further specified (this
+        is possible for captured_piece and promotion_piece), or else it will be the known value of that move
+        element.  
+        In order to get the piece capitalization parts correct, to determine squares if castling, and key ranks
+        for pawns, it is necessary to know who is moving (white or black). The argument "white_is_moving" is 
+        treated as boolean throughout and if evaluates to False, then black is considered to be moving. 
+        The 'make_assumptions' argument controls whether the moving piece is assumed to be a pawn if no moving
+        piece is specified. In general, this should probably be True if we wanted to guess in the abstract what
+        a person most likely meant, but it should probably be False if we are going to use a Game legal move 
+        list to narrow down what they could have meant.  In that case it is better to leave the piece as unknown
+        and see what the known move elements match.  Since the plan is to mostly use this function to compare
+        with legal move lists, the default is False. 
+        '''
+        black_is_moving = not white_is_moving
+        kingside_castling_patt = re.compile(r"^\s*([oO0])-\1\s*")
+        queenside_castling_patt = re.compile(r"^\s*([oO0])-\1-\1\s*")
+        no_dest_capture_patt = re.compile(r"""
+            ^\s*
+            (?P<moving_piece>[KQRBNPkqrbnp]) # pieces which can capture
+            x
+            (?P<captured_piece>[QRBNPqrbnp]) # pieces which can be captured
+            [+]? # check indicator (optional and ignored)
+            \s*$
+            """, re.VERBOSE) # Matches moves like RxB with no square information
+        normal_move_patt = re.compile(r"""
+            \s*                             # ignore any leading whitespace
+            (?P<piece_char>[KQRBNPkqrbnp])? # piece character, if present (optional for pawns)
+            (?P<starting_file>[a-h])?(?P<starting_rank>[1-8])? # any elements of the source square, if present
+            (?P<capture_indicator>[xX][QRBNqrbn]?)?        # capture indicator, if present (this is always optional, but we could use it to catch user error if they try to capture an empty square)
+            (?P<dest_square>[a-h][1-8])     # destination square (the only non-optional part of the move for this pattern)
+            ( (?P<promotion_indicator>=)    # pawn promotion is indicated by = sign
+                (?P<promotion_piece>[QRBNqrbn]) # promotion piece character
+            )?  # promotion indicator and piece (required for pawn promotion, required to be absent for all other moves)
+            (?P<ep_capture_indicator>e[.]?p[.]?)? # optional ep or e.p. to indicate en passant capture (always optional but could use to catch user errors)
+            [+]? # check indicator (optional and ignored)      
+            \s*$                            # Ignore any trailing whitespace
+            """, re.VERBOSE)
+
+        move_elements = ['single_char','starting_file', 'starting_rank','destination_square','captured_piece','is_castling','promotion_piece','is_en_passant_capture','new_en_passant_square']
+        move_elem_dict = {}
+        for e in move_elements:
+            move_elem_dict[e] = 'unknown'
+        notNone  = "not_None"
+        msg = 'Other Messages:\n'
+        # Queenside castling (queenside first because kingside pattern will match queenside castling)
+        if queenside_castling_patt.match(entered_move):
+            # Queenside castling
+            move_elem_dict['is_castling'] = True
+            move_elem_dict['captured_piece'] = None
+            move_elem_dict['promotion_piece'] = None
+            move_elem_dict['is_en_passant_capture'] = False
+            move_elem_dict['new_en_passant_square'] = None
+            if white_is_moving:
+                move_elem_dict['single_char'] = 'K'
+                move_elem_dict['starting_file'] = 'e'
+                move_elem_dict['starting_rank'] = '1'
+                move_elem_dict['destination_square'] = 'c1'
+            elif black_is_moving:
+                move_elem_dict['single_char']  = 'k'
+                move_elem_dict['starting_file'] = 'e'
+                move_elem_dict['starting_rank'] = '8'
+                move_elem_dict['destination_square'] = 'c8'
+        # Kingside castling
+        elif kingside_castling_patt.match(entered_move):
+            move_elem_dict['is_castling'] = True
+            move_elem_dict['captured_piece'] = None
+            move_elem_dict['promotion_piece'] = None
+            move_elem_dict['is_en_passant_capture'] = False
+            move_elem_dict['new_en_passant_square'] = None
+            if white_is_moving:
+                move_elem_dict['single_char'] = 'K'
+                move_elem_dict['starting_file'] = 'e'
+                move_elem_dict['starting_rank'] = '1'
+                move_elem_dict['destination_square'] =  'g1'
+            elif black_is_moving:
+                move_elem_dict['single_char']  = 'k'
+                move_elem_dict['starting_file'] = 'e'
+                move_elem_dict['starting_rank'] = '8'
+                move_elem_dict['destination_square'] =  'g8'
+        elif no_dest_capture_patt.match(entered_move):
+            # can tell moving piece, captured piece, and know that new_en_passant_square should be None
+            m = no_dest_capture_patt.match(entered_move)
+            single_char = m.group('moving_piece')
+            captured_piece = m.group('captured_piece')
+            move_elem_dict['single_char'] = single_char.upper() if white_is_moving else single_char.lower()
+            move_elem_dict['captured_piece'] = captured_piece.lower() if white_is_moving else captured_piece.upper()
+            move_elem_dict['new_en_passant_square'] = None # a capture cannot generate a new ep square
+            move_elem_dict['is_castling'] = False
+            if single_char.lower()!='p' or captured_piece.lower()!='p':
+                move_elem_dict['is_en_passant_capture'] = False # only pawn take pawn could be ep capture
+            if single_char.lower()!='p':
+                move_elem_dict['promotion_piece'] = None # non-pawns can't promote
+            elif captured_piece.lower()=='p':
+                move_elem_dict['promotion_piece'] = None # if you captured a pawn you can't be promoting, because an enemy pawn can't be on the final rank
+        elif normal_move_patt.match(entered_move):
+            move_elem_dict['is_castling'] = False
+            m = normal_move_patt.match(entered_move)
+            destination_square = m.group('dest_square') # this is the only non-optional part of the match, this must be present if we are in this branch
+            move_elem_dict['destination_square'] = destination_square
+            single_char = m.group('piece_char') # may be None
+            starting_rank = m.group('starting_rank') # may be None
+            if starting_rank is not None:
+                move_elem_dict['starting_rank'] = starting_rank
+            starting_file = m.group('starting_file') # may be None
+            if starting_file is not None:
+                move_elem_dict['starting_file'] = starting_file
+            capture_indicator = m.group('capture_indicator') # may be x or x<piece> or None
+            promotion_indicator = m.group('promotion_indicator')
+            promotion_piece = m.group('promotion_piece') # may be None
+            ep_capture_indicator = m.group('ep_capture_indicator') # may be None
+            
+            # Piece_char?
+            if single_char is None and make_assumptions:
+                # Assume pawn 
+                single_char = 'P' if white_is_moving else 'p'
+                msg += 'assumed "P" for missing piece character\n'
+            if single_char is not None:
+                single_char = single_char.upper() if white_is_moving else single_char.lower()
+                move_elem_dict['single_char'] = single_char
+            # Captured piece?
+            if capture_indicator is not None:
+                if  len(capture_indicator)==2:
+                    captured_piece = capture_indicator[1].lower() if white_is_moving else capture_indicator[1].upper()
+                    move_elem_dict['captured_piece'] = captured_piece
+                else:
+                    move_elem_dict['captured_piece'] = notNone
+                    msg += 'we know there was a capture (captured piece not None), but not what piece was captured\n'
+            # Promotion piece?
+            if single_char and single_char.lower() != 'p':
+                # if piece is known and not a pawn, can't be promotion
+                move_elem_dict['promotion_piece'] = None # non-pawns can't promote
+            elif destination_square[1] != '8' and destination_square[1] !='1':
+                # no matter what the piece (known or unknown), if not going to rank 1 or 8 can't be promoting
+                move_elem_dict['promotion_piece'] = None
+            elif single_char and single_char.lower() == 'p':
+                # pawn moving to last rank, must involve promotion!
+                if promotion_piece is not None:
+                    move_elem_dict['promotion_piece'] = promotion_piece
+                else:
+                    move_elem_dict['promotion_piece'] = notNone
+                    msg += "promotion_piece is not None, but we don't know what it should be\n"
+            else:
+                # single_char is None, and destination_square is on first or last rank
+                # Promotion state is unknown, could be a pawn promoting or could be a non-pawn not promoting.
+                # However, if the user specified a promotion piece, then safe to assume unspecified piece is 
+                # a pawn and that promotion is taking place. Otherwise don't assume either way
+                if promotion_piece is not None:
+                    move_elem_dict['promotion_piece'] = promotion_piece
+                    move_elem_dict['single_char'] = 'P' if white_is_moving else 'p'
+
+            # E.P. Capture? and/or New EP Square?
+            if single_char and single_char.lower() != 'p':
+                # non-pawn moving piece
+                move_elem_dict['is_en_passant_capture'] = False # can't be ep capture if moving piece is not a pawn
+                move_elem_dict['new_en_passant_square'] = None # non-pawn moves can't create ep squares
+            elif single_char and single_char.lower() == 'p':
+                # moving piece IS a pawn
+                if ep_capture_indicator is not None:
+                    move_elem_dict['is_en_passant_capture'] = True # if moving piece is a pawn 
+                    if capture_indicator is not None and len(capture_indicator)==2:
+                        # captured piece already assigned and marked known
+                        pass
+                    else:
+                        move_elem_dict['captured_piece'] = 'P' if white_is_moving else 'p'
+                    move_elem_dict['new_en_passant_square'] = None # ep captures can't create new ep squares
+                # Otherwise, the only way to know an ep square creation state is to know the moving piece and the starting and destination squares
+                if starting_file is not None and starting_rank is not None:
+                    if starting_rank=='2' and destination_square[1]=='4':
+                        new_en_passant_square = destination_square[0]+'3'
+                    elif starting_rank=='7' and destination_square[1]=='5':
+                        new_en_passant_square = destination_square[0]+'6'
+                    else:
+                        new_en_passant_square = None
+                    move_elem_dict['new_en_passant_square'] = new_en_passant_square
+            else:
+                # Moving piece is unknown, might be a pawn, might not
+                # However, if the destination square is not on the proper rank, it
+                # cannot possibly be an ep capture
+                if (white_is_moving and destination_square[1] != '6') or (black_is_moving and destination_square[1] != '3'):
+                    move_elem_dict['is_en_passant_capture'] = False
+                elif starting_rank and ((white_is_moving and starting_rank != '5') or (black_is_moving and starting_rank != '4')):
+                    # Even if destination rank is correct for ep capture, we can still rule it out if the starting rank 
+                    # is not correct for possible ep capture
+                    move_elem_dict['is_en_passant_capture'] = False
+
+                # Likewise, if the destination square is not on the proper rank, it
+                # cannot possibly create a new ep square
+                if (white_is_moving and destination_square[1] !='4') or (black_is_moving and destination_square[1] != '5'):
+                    move_elem_dict['new_en_passant_square'] = None
+                elif starting_rank and ((white_is_moving and starting_rank != '2') or (black_is_moving and starting_rank !='7')):
+                    # Even if destination square is the right rank, if the starting square isn't the right rank, then 
+                    # it is impossible to generate a new ep square
+                    move_elem_dict['new_en_passant_square'] = None
+
+        # Conditional tree traversed, let's take a look at the results
+        print("Move Elements")
+        for key, value in move_elem_dict.items():
+            print("%s: %s"%(key, str(value)))
+        print(msg)
+
+        # Could have a dict where move element names are keys, and all initially have value of 'unknown'
+        # Then could fill in with actual value or with 'notNone', or leave as 'unknown'
+        # Then, for unpacking, can check if value is 'unknown', 'notNone', or something else (means known)
+        # TODO: could add reason_dict with move element keys and reasons as values (i.e. "because only pawns can promote", or "because castling can't cause captures")
+        return move_elem_dict
+
+    @classmethod
+    def find_matches_to_partial_move(cls, partial_move_dict, move_list):
+        ''' Find all possible matches where every known or partially known element of partial_move_dict 
+        is consistent with a Move object on the given move_list. partial_move_dict should be the 
+        output of parse_move_without_game().  
+        '''
+        unk = 'unknown'
+        notNone = 'not_None'
+        pmd = partial_move_dict # save typing
+        matched_moves = []
+        for move in move_list:
+            # Check each field
+            if (    (pmd['single_char']==unk or (move.single_char == pmd['single_char']))
+                and (pmd['starting_file']==unk or (Board.square_file_lett(move.starting_square) == pmd['starting_file']))
+                and (pmd['starting_rank']==unk or (Board.square_rank_str(move.starting_square) == pmd['starting_rank']))
+                and (pmd['destination_square']==unk or (Board.square_to_alg_name(move.destination_square) == pmd['destination_square']))
+                and (pmd['captured_piece']==unk or (move.captured_piece == pmd['captured_piece']) or (pmd['captured_piece']==notNone and move.captured_piece is not None)) 
+                and (pmd['is_castling']==unk or (move.is_castling == pmd['is_castling']))
+                and (pmd['promotion_piece']==unk or (pmd['promotion_piece']==notNone and move.promotion_piece is not None) or (move.promotion_piece == pmd['promotion_piece']))
+                and (pmd['is_en_passant_capture']==unk or (pmd['is_en_passant_capture'] == move.is_en_passant_capture))
+                and (pmd['new_en_passant_square']==unk or (pmd['new_en_passant_square'] == move.new_en_passant_square))
+                ):
+                matched_moves.append(move)
+        return matched_moves
+
+    @classmethod
+    def is_on_move_list(cls, move, move_list):
+        # Returns true if given move is on given move list
+        for list_move in move_list:
+            if list_move == move:
+                return True
+        return False
+
+    def __eq__(self, move_to_match):
+        # Returns true if self and move_to_match represent the same move in all respects
+        if (self.single_char == move_to_match.single_char and
+            self.starting_square == move_to_match.starting_square and
+            self.destination_square == move_to_match.destination_square and
+            self.captured_piece == move_to_match.captured_piece and
+            self.promotion_piece == move_to_match.promotion_piece and
+            self.is_en_passant_capture == move_to_match.is_en_passant_capture and
+            self.new_en_passant_square == self.new_en_passant_square):
+            return True
+        else:
+            return False
+
+        
+
+class Player:
+    ''' Parent class for players
+    '''
+    def __init__(self, color=None):
+        self.set_color(color)
+    
+    def set_color(self, color):
+        if color is None:
+            self.color = None
+        elif color[0].lower()=='w':
+            self.color = 'w'
+        elif color[0].lower()=='b':
+            self.color = 'b'
+        else:
+            raise Exception('Invalid color')
+
+    def choose_move(self, game, legal_moves_list):
+        '''Placeholder which subclasses should implement, needs to return a Move object'''
+        pass
+
+    def is_valid_move(self, move, legal_move_list):
+        # Checks if move matches one on legal move list
+        pass # Maybe should be a Move function??? Maybe want Game object too?
+
+class RLMPlayer (Player):
+    ''' Class to encapsulate RLM player behaviors
+    '''
+    def choose_move(self, game, legal_moves_list):
+        # RLM player generates the list of possible legal moves, and chooses a random one off the list
+        chosen_move = random.choice(legal_moves_list)
+        print('RLM player played %s'%chosen_move.to_long_algebraic())
+        return chosen_move
+
+class HumanPlayer (Player):
+    ''' Class to handle interaction with human player during a game (mostly requesting a move)
+    '''
+    def choose_move(self, game, legal_moves_list):
+        '''Prompt the human player to enter a move'''
+        valid_move_entered = False
+        while not valid_move_entered:
+            entered_move = input("What is your move?\nEnter move: ") # TODO make this better
+            # Convert entered move to Move object
+            partial_move_dict = Move.parse_move_without_game(entered_move, white_is_moving=(game.side_to_move=='w'))
+            matching_moves = Move.find_matches_to_partial_move(partial_move_dict, legal_moves_list)
+            if len(matching_moves)==1:
+                move = matching_moves[0]
+                valid_move_entered = True
+                msg = 'Your move is %s, got it!'%(move.to_long_algebraic())
+            elif len(matching_moves)==0:
+                msg = 'Your entered move did not match any legal moves... try again!\n'
+                # TODO this can be much improved!!  We could identify the move with the closest match, ask them if they 
+                # meant that, we can explain what move elements could not be matched, etc. 
+            else:
+                # More than 1 legal move matched all the information they supplied, let's offer them a choice...
+                move_str_list = [m.to_long_algebraic() for m in matching_moves]
+                msg = 'Your entered move was consistent with %i legal moves, one of the following would be less ambiguous:\n'%len(matching_moves)
+                for m in move_str_list:
+                    msg += m + '\n'
+                msg += 'Try again!\n'
+            print(msg)
+        return move
+    
+
+class NRLMPlayer (Player):
+    '''Non-Random Legal Move Player.  Chooses moves in a non-random way (currently just the first move on the legal move list)
+    '''
+    def choose_move(self, game, legal_moves_list):
+        return legal_moves_list[0]
+
 
 class GameController:
     '''
@@ -542,6 +890,83 @@ class GameController:
     post-game processes (e.g. saving to PGN).  Game state should be held in a Game 
     object, board state in a Board object.  
     '''
+    '''
+    Move generation is complete, what would we need to add to have a playable game?
+    * Interface with human player (prompts, move validation)
+    * Record game history
+    * Recognize checkmate and stalemate and handle game end
+    '''
+
+    def start_new_game(self):
+        '''Start a new game'''
+        # Ask about playing game
+        start_game_answer = input('Hey there, do you want to play a game of chess?\n(Y/n): ')
+        if len(start_game_answer)>0 and start_game_answer[0].lower()=='n':
+            print("Fine!! I'll play myself then!! You can watch.")
+            white_player = RLMPlayer()
+            black_player = RLMPlayer()
+        else: 
+            # Choose colors
+            side_answer = input('Would you like to play as white or black?\n(W/b): ')
+            if len(side_answer)>0 and side_answer[0].lower()=='b':
+                print("OK, I'll play as white!")
+                white_player = RLMPlayer()
+                black_player = HumanPlayer()
+            else:
+                print("OK, I'll play as black!")
+                black_player = RLMPlayer()
+                white_player = HumanPlayer()
+        # Initialize game and force normal starting position for now...
+        game = Game()
+        game.set_board(Board()) # defaults to normal starting position
+        game.set_players(white_player, black_player)
+
+        print("Here is the starting position:")
+        game.show_board()
+
+        # The game loop
+        game_is_over = False
+        legal_moves = game.get_moves_for()
+        while not game_is_over:
+            if game.side_to_move[0] == 'w':
+                move = white_player.choose_move(game, legal_moves)
+            else:
+                move = black_player.choose_move(game, legal_moves)
+            # Carry out chosen move and update game
+            game.make_move(move)
+            
+            game.show_board()
+            # To see if game is over, check if there are legal moves (if there aren't any, it's either stalemate or checkmate)
+            legal_moves = game.get_moves_for()
+            if len(legal_moves)==0:
+                game_is_over = True # checkmate or stalemate
+                # Need to find if the side to move's king is currently in check
+                if game.side_to_move=='w':
+                    K = [p for p in game.white_pieces if isinstance(p, King)][0]
+                    game_over_msg = 'CHECKMATE!! Black wins!' if K.is_in_check() else "STALEMATE!!  It's a draw!"
+                else:
+                    k = [p for p in game.black_pieces if isinstance(p, King)][0]
+                    game_over_msg = 'CHECKMATE!! White wins!' if k.is_in_check() else "STALEMATE!!  It's a draw!"
+            elif game.half_moves_since >= 100: # TODO: check if this should be > or >=
+                game_is_over = True
+                game_over_msg = "DRAW!! That's 50 moves with no captures or pawn moves!"
+
+        # The game has ended...
+        print(game_over_msg)
+        print("Thanks for playing!")
+        move_hist_ans = input("Shall I print the move history for this game?\n[Y/n]:")
+        if not (move_hist_ans and move_hist_ans[0].lower()=='n'):
+            # Print move history unless user indicates no
+            game.print_move_history()
+            
+            
+
+        
+
+
+
+
+
 class Game:
     '''Class to hold a game state.  Game state includes everything in an FEN, plus
     a unique GameID.  Probably makes sense for it to keep track of everything that
@@ -556,16 +981,21 @@ class Game:
         self.white_pieces = []
         self.black_pieces = []
         self.board = None # This needs to be initialized before we can really play a game, but let's start with a placeholder which indicates it's not initialized
+        self.white_player = None
+        self.black_player = None
+        self.move_history = []
 
 
     def copy(self):
         game_copy = Game()
         game_copy.ep_square = self.ep_square
-        game_copy.castling_state = self.castling_state
+        game_copy.castling_state = self.castling_state.copy()
         game_copy.side_to_move = self.side_to_move
-        game_copy.white_pieces = self.white_pieces
-        game_copy.black_pieces = self.black_pieces
+        game_copy.white_pieces = self.white_pieces.copy()
+        game_copy.black_pieces = self.black_pieces.copy()
         game_copy.board = self.board.copy() # make a copy of the board, don't reference same board
+        # NOTE: Any need to copy Players? (not yet, but consider)
+        game_copy.move_history = self.move_history.copy()
         return game_copy
 
 
@@ -573,11 +1003,29 @@ class Game:
         self.board = board
         self.initialize_pieces_from_board(board)
 
-    def make_move(self, move, change_side_to_move=True):
-        '''Update board and pieces based on move.  change_side_to_move flag determines
-        whether the side_to_move is changed (default) or remains in current state, which
-        is desirable for imagined moves.  
-        NOTE that this update the game's Board object and replaces the Piece objects
+    def set_players(self, white_player, black_player):
+        self.white_player = white_player
+        self.black_player = black_player
+
+    def show_board(self):
+        '''Print board string (could also be configured to call a graphical displayer once we've worked that out)'''
+        print(self.board)
+
+    def print_move_history(self):
+        # Should print the game's move history in approximately pgn format (i.e. "1. Pe2e4  Pc7c5\n 2. Pd2d4", etc)
+        hist_str = 'Move History:\n'
+        for idx, move in enumerate(self.move_history):
+            if idx % 2 == 0:
+                # odd move, white
+                hist_str += "%i. %s  "%((idx/2+1), move.to_long_algebraic(use_figurine=True, note_ep=True))
+            else:
+                # even move, black
+                hist_str += "%s\n" % (move.to_long_algebraic(use_figurine=True, note_ep=True))
+        print(hist_str)
+
+    def make_move(self, move):
+        '''Update board, pieces, and game state based on move.  
+        NOTE that this updates the game's Board object and replaces the Piece objects
         This may need to be changed in the future if piece objects got more complex and
         were storing something like a move history, or anything like that. '''
 
@@ -601,7 +1049,7 @@ class Game:
             else:
                 raise Exception("Move said it was castling move, but didn't move to g or c file, instead moved to '%s'" % board.square_to_alg_name(dest_sq) )
             # Also need to update castling options (no longer allowed, can't castle twice)
-            if move.char=='K': # white
+            if move.single_char=='K': # white
                 self.set_castling_state('K', False)
                 self.set_castling_state('Q', False)
             else:
@@ -610,23 +1058,46 @@ class Game:
         elif move.is_en_passant_capture:
             # Also need to remove captured pawn from board
             board[move.destination_square[0], move.starting_square[1]] = Board.EMPTY_SQUARE
+        # Moving the king invalidates castling on both sides
+        elif move.single_char=='K':
+            self.set_castling_state('K', False)
+            self.set_castling_state('Q', False)
+        elif move.single_char=='k':
+            self.set_castling_state('k', False)
+            self.set_castling_state('q', False)
+        # Moving a rook off it's starting square disables castling on that side
+        elif move.single_char=='R':
+            if board.is_same_square(move.starting_square, 'h1'):
+                self.set_castling_state('K', False)
+            elif board.is_same_square(move.starting_square, 'a1'):
+                self.set_castling_state('Q', False)
+        elif move.single_char=='r':
+            if board.is_same_square(move.starting_square, 'h8'):
+                self.set_castling_state('k', False)
+            elif board.is_same_square(move.starting_square, 'a8'):
+                self.set_castling_state('q', False)
+        # Handle pawn promotion
+        elif move.promotion_piece is not None:
+            board[move.destination_square] = move.promotion_piece.upper() if move.single_char==move.single_char.upper() else move.promotion_piece.lower() # assure case is correct (matches original pawn case)
 
         # Update the game list of pieces from the updated board (existing pieces are discarded)
         self.initialize_pieces_from_board(board) # this makes the board the master representation
 
         # There are several housekeeping things we only really need to do if this is a real move (rather than imagined)
         # This is indicated by the change_side_to_move flag: if true, this is a real move, if not, it's imagined
-        if change_side_to_move:
-            self.move_counter = self.move_counter+1 if self.side_to_move == 'b' else self.move_counter # increment if black just moved
-            if move.captured_piece is not None or move.char.upper()=='P':
-                # reset if capture or pawn move
-                self.half_moves_since = 0
-            else:
-                self.half_moves_since += 1
-            # Change side to move
-            self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
-            # Update game ep square
-            self.ep_square = move.new_en_passant_square
+        #if change_side_to_move:
+        self.move_counter = self.move_counter+1 if self.side_to_move == 'b' else self.move_counter # increment if black just moved
+        if move.captured_piece is not None or move.single_char.upper()=='P':
+            # reset if capture or pawn move
+            self.half_moves_since = 0
+        else:
+            self.half_moves_since += 1
+        # Change side to move
+        self.side_to_move = 'b' if self.side_to_move=='w' else 'w' # toggle side to move between w and b
+        # Update game ep square
+        self.ep_square = move.new_en_passant_square
+        # Add move to move history
+        self.move_history.append(move)
 
   
     def set_white_to_move(self):
@@ -917,7 +1388,7 @@ class King (KQRBN_Piece):
         if not allow_own_king_checked:
             kingside_allowed_by_state, queenside_allowed_by_state = self.game.get_castling_state(self.color) 
             kingside_allowed_by_position, queenside_allowed_by_position = self.get_castling_allowed_by_position() 
-            kingside_allowed_by_check, queenside_allowed_by_check = self.get_castling_allowed_by_check() # TODO: write this function
+            kingside_allowed_by_check, queenside_allowed_by_check = self.get_castling_allowed_by_check() 
 
             kingside_allowed = kingside_allowed_by_state and kingside_allowed_by_position and kingside_allowed_by_check
             queenside_allowed = queenside_allowed_by_state and queenside_allowed_by_position and queenside_allowed_by_check
@@ -962,6 +1433,9 @@ class King (KQRBN_Piece):
                     queenside_allowed = True
                 else:
                     queenside_allowed = False
+            else: 
+                kingside_allowed = False
+                queenside_allowed = False
         else: # black
             if board['e8']=='k':
                 # Kingside
@@ -973,6 +1447,9 @@ class King (KQRBN_Piece):
                     queenside_allowed = True
                 else:
                     queenside_allowed = False
+            else:
+                kingside_allowed = False
+                queenside_allowed = False
         return kingside_allowed, queenside_allowed
        
     def get_castling_allowed_by_check(self):
@@ -1007,8 +1484,8 @@ class King (KQRBN_Piece):
         resulting board position. Should be careful to not to alter the game board position
         permanently, this is an imagined move, not yet an actual move.'''
         temp_game = self.game.copy() # make a copy of the game to imagine move
-        temp_game.make_move(move, change_side_to_move=False)
-        other_side_moves = temp_game.get_moves_for(other_side=True, allow_own_king_checked=True)
+        temp_game.make_move(move) # make the move in the game copy
+        other_side_moves = temp_game.get_moves_for(allow_own_king_checked=True)
         other_side_dest_squares = [move.destination_square for move in other_side_moves]
         for other_side_dest in other_side_dest_squares:
             if temp_game.board[other_side_dest]==self.char:
@@ -1131,8 +1608,16 @@ class Pawn (Piece):
                 # Moving forward one square
                 move_candidates.append( Move(self.char, self.current_square, forward_sq) )
 
-        if self.game.ep_square is not None:
+        if self.game.ep_square is not None and not allow_own_king_checked:
             ep_square = board.square_name_to_array_idxs(self.game.ep_square) #standardize
+            # NOTE: added condition that if allow_own_king_checked is True, then ignore any existing 
+            # e.p. square because if allow_own_king_checked is True, then that means that we are
+            # imagining moves for the non-moving side, whereas any ep square is going to be for the 
+            # moving side.  Therefore this was generating a bug where, for example, a white pawn was
+            # trying to capture another white pawn e.p., which is not an actual move.  This fix
+            # means that if an ep capture was going to be possible in some way, that would be missed.
+            # I don't think that's a problem, but if it is it will need to be solved in some way which 
+            # doesn't reintroduce this bug. 
         else:
             ep_square = None
         # Check diagonal moves for captures
@@ -1169,14 +1654,14 @@ class Pawn (Piece):
 
 
 def sillyDude():
-    dude = choice(['Mike', 'Bryan'])
+    dude = random.choice(['Mike', 'Bryan'])
     print("Is " + dude + " silly?:")
     def backline():        
         print(' ' * messagelen, end='')
         print('\r', end='')
 
     for __ in range(50):
-        compute = random()
+        compute = random.random()
         message = "Computing... " + str(compute)
         messagelen = len(message)
         time.sleep(compute/10)
@@ -1217,7 +1702,7 @@ class Lexicon:
         :param str pos: a part-of-speech labeled in the lexicon
         :return str bleh: a random word of the given POS
         '''
-        bleh = choice(self.lex[pos])
+        bleh = random.choice(self.lex[pos])
         return bleh
 
 
@@ -1411,6 +1896,10 @@ class TestRLM:
 
 def run_me_if_i_am_the_main_file():
 
+    # Try playing a game!
+    gc = GameController()
+    gc.start_new_game()
+    
     # Run the test I'm working on right now!
     TestRLM().test_pawn_moves_1()
     
