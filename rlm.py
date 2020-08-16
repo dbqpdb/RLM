@@ -696,7 +696,7 @@ class Move:
             elif single_char and single_char.lower() == 'p':
                 # pawn moving to last rank, must involve promotion!
                 if promotion_piece is not None:
-                    move_elem_dict['promotion_piece'] = promotion_piece
+                    move_elem_dict['promotion_piece'] = promotion_piece.upper() if white_is_moving else promotion_piece.lower()
                 else:
                     move_elem_dict['promotion_piece'] = notNone
                     msg += "promotion_piece is not None, but we don't know what it should be\n"
@@ -789,6 +789,15 @@ class Move:
                 ):
                 matched_moves.append(move)
         return matched_moves
+
+    @classmethod
+    def parse_entered_move(cls, entered_move, white_is_moving, legal_moves_list):
+        # Parses entered text move, and returns the set of legal moves which is 
+        # consistent with entered info
+        partial_move_dict = cls.parse_move_without_game(entered_move, white_is_moving)
+        matched_moves = cls.find_matches_to_partial_move(partial_move_dict, legal_moves_list)
+        return matched_moves
+
 
     @classmethod
     def is_on_move_list(cls, move, move_list):
@@ -1756,6 +1765,50 @@ class TestRLM:
         except Exception as e:
             print('Test: test_pawn_moves_1 FAILED with error message "%s"' % (str(e)))
         
+    def test_entered_move_processing(self):
+        #  Test a variety of entered moves in constructed board positions and make sure
+        #  moves are interpreted properly
+        # Set up a board we can use for tests
+        K = King('w', 'e1') # so white king can castle
+        k = King('b', 'f7')
+        R1 = Rook('w', 'a1') # white king can castle
+        R2 = Rook('w', 'h1') # so white king can castle
+        r1 = Rook('b', 'a8')
+        r2 = Rook('b', 'h8')
+        P1 = Pawn('w', 'b7') # able to promote and capture-promote
+        p1 = Pawn('b', 'c5') # pawn which could be ep captured
+        P2 = Pawn('w', 'd5') # pawn which do ep capture on c6
+
+        b = Board(piece_list = [K,k,R1,R2,r1,r2,P1,p1,P2])
+        g = Game()
+        g.set_board(b)
+        g.set_white_to_move()
+        g.ep_square = 'c6'
+        legal_moves_list = g.get_moves_for()
+        
+        # Test pawn promotion
+        entered_move = 'b8=Q'
+        matching_moves = Move.parse_entered_move(entered_move, white_is_moving=g.side_to_move=='w', legal_moves_list=legal_moves_list)
+        expected_matching_moves = [Move('P', 'b7','b8', promotion_piece='Q')]
+        assert(len(matching_moves)==len(expected_matching_moves), "There should be exactly %i matching move(s), but %i were found!"%(len(expected_matching_moves), len(matching_moves)) )
+        entered_move = 'bxa8=N'
+        entered_move = 'bxa8' # ambiguous because it doesn't specify promotion piece
+        entered_move = 'bxR'# THIS IS TRICKY!!  In this position, it means b pawn takes R on a8, but it is ambiguous with bishop x Rook
+        # Test ep capture
+        entered_move = 'dxc6'
+        entered_move = 'd5xc6'
+        entered_move = 'dxc6ep'
+        entered_move = 'dxc6 ep'
+        entered_move = 'dxc6 e.p.'
+        entered_move = 'c6'
+        entered_move = 'c6 e.p.'
+        # Test castling
+        # Test different move styles
+        # Test ambiguous move case
+        # Test illegal move
+        entered_move = 'Pf6xc6 e. p. '
+
+        return True
 
     def test_board_generation_from_piece_list_1(self):
         # Very simple test of board generation from list of pieces, just two kings
@@ -1896,12 +1949,12 @@ class TestRLM:
 
 def run_me_if_i_am_the_main_file():
 
+    # Run the test I'm working on right now!
+    TestRLM().test_entered_move_processing()
+
     # Try playing a game!
     gc = GameController()
     gc.start_new_game()
-    
-    # Run the test I'm working on right now!
-    TestRLM().test_pawn_moves_1()
     
     # Prepare the loudmouth
     me = Loudmouth()
