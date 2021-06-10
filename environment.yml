@@ -1,0 +1,42 @@
+name: rlm
+channels:
+  - defaults
+dependencies:
+  - _libgcc_mutex
+  - blas
+  - ca-certificates
+  - certifi
+  - flake8
+  - importlib-metadata
+  - intel-openmp
+  - ld_impl_linux-64
+  - libedit
+  - libffi
+  - libgcc-ng
+  - libgfortran-ng
+  - libstdcxx-ng
+  - mccabe
+  - mkl
+  - mkl-service
+  - mkl_fft
+  - mkl_random
+  - ncurses
+  - numpy
+  - numpy-base
+  - openssl
+  - pandas
+  - pip
+  - pycodestyle
+  - pyflakes
+  - python
+  - python-dateutil
+  - pytz
+  - readline
+  - setuptools
+  - six
+  - sqlite
+  - tk
+  - wheel
+  - xz
+  - zipp
+  - zlib
