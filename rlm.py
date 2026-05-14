@@ -159,8 +159,10 @@ class Board:
         Returns file, rank.  If either can't be interpreted or are off board, that index is returned as None
         '''
         assert len(square_name)==2, 'Board square names must have len 2 to be interpretable!'
-        # Convert first element of square name to a file index (or None if it doesn't convert)
-        file_idx = Board.FILE_TO_IDX_DICT.setdefault(square_name[0], None)
+        # Convert first element of square name to a file index (or None if it doesn't convert).
+        # Use .get() rather than .setdefault() — setdefault would mutate the class-level dict on any
+        # unknown key, accumulating garbage entries across the lifetime of the process.
+        file_idx = Board.FILE_TO_IDX_DICT.get(square_name[0])
         # Try to convert second element of square name to a rank index
         try:
             if isinstance(square_name[1], str):
