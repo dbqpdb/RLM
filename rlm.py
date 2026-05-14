@@ -1790,7 +1790,7 @@ class TestRLM:
         entered_move = 'b8=Q'
         matching_moves = Move.parse_entered_move(entered_move, white_is_moving=g.side_to_move=='w', legal_moves_list=legal_moves_list)
         expected_matching_moves = [Move('P', 'b7','b8', promotion_piece='Q')]
-        assert(len(matching_moves)==len(expected_matching_moves), "There should be exactly %i matching move(s), but %i were found!"%(len(expected_matching_moves), len(matching_moves)) )
+        assert len(matching_moves) == len(expected_matching_moves), "There should be exactly %i matching move(s), but %i were found!" % (len(expected_matching_moves), len(matching_moves))
         entered_move = 'bxa8=N'
         entered_move = 'bxa8' # ambiguous because it doesn't specify promotion piece
         entered_move = 'bxR'# THIS IS TRICKY!!  In this position, it means b pawn takes R on a8, but it is ambiguous with bishop x Rook
