@@ -204,33 +204,44 @@ def layered(
 # CLI
 # ---------------------------------------------------------------------------
 
+N_SAMPLES = 5
+
+
 def _hr(title: str) -> str:
     return f"\n{'=' * 60}\n{title}\n{'=' * 60}\n"
 
 
+def _print_samples(title: str, fn, n: int = N_SAMPLES) -> None:
+    """Print n variations of fn() under a single section header."""
+    print(_hr(title))
+    for i in range(1, n + 1):
+        print(f"-- sample {i}/{n} --")
+        print(fn())
+        print()
+
+
 def print_all_options() -> None:
-    print(_hr("Option 1: mask + random fill character"))
-    print(option_1_random_fill())
-    print(_hr("Option 2: per-cell jitter"))
-    print(option_2_per_cell_jitter())
-    print(_hr("Option 3: pre-designed font pool"))
-    print(option_3_font_pool())
-    print(_hr("Option 4: pyfiglet with a random font"))
-    print(option_4_pyfiglet())
-    print(_hr("Option 5: glitch overlay"))
-    print(option_5_glitch())
+    _print_samples("Option 1: mask + random fill character", option_1_random_fill)
+    _print_samples("Option 2: per-cell jitter", option_2_per_cell_jitter)
+    _print_samples("Option 3: pre-designed font pool", option_3_font_pool)
+    _print_samples("Option 4: pyfiglet with a random font", option_4_pyfiglet)
+    _print_samples("Option 5: glitch overlay", option_5_glitch)
 
 
 def print_layered_tunings() -> None:
+    tunings = [
+        ("subtle", dict(jitter_density=0.10, drop_density=0.0, bg_noise=0.02)),
+        ("medium", dict(jitter_density=0.30, drop_density=0.06, bg_noise=0.06)),
+        ("heavy", dict(jitter_density=0.40, drop_density=0.10, bg_noise=0.10)),
+    ]
     print(_hr("Layered (base = pre-designed banner), three tunings"))
-    print("-- subtle  (jitter=0.10, drop=0.00, bg=0.02) --")
-    print(layered(jitter_density=0.10, drop_density=0.0, bg_noise=0.02))
-    print()
-    print("-- medium  (jitter=0.30, drop=0.06, bg=0.06) --")
-    print(layered(jitter_density=0.30, drop_density=0.06, bg_noise=0.06))
-    print()
-    print("-- heavy   (jitter=0.60, drop=0.20, bg=0.16) --")
-    print(layered(jitter_density=0.60, drop_density=0.20, bg_noise=0.16))
+    for name, params in tunings:
+        params_str = ", ".join(f"{k.split('_')[0]}={v}" for k, v in params.items())
+        print(f"### {name}  ({params_str}) ###")
+        for i in range(1, N_SAMPLES + 1):
+            print(f"-- sample {i}/{N_SAMPLES} --")
+            print(layered(**params))
+            print()
 
 
 def main() -> None:
