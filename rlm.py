@@ -141,7 +141,7 @@ class Board:
         assert re.match(Board.VALID_BOARD_SQUARE_CONTENTS_PATTERN, new_value), 'new_value "%s" is not a valid character to place in a Board array' % (new_value)
         file_idx, rank_idx = self.square_name_to_array_idxs(square_name)
         if rank_idx is None or file_idx is None:
-            Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
+            raise Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
         else:
             self.board_array[rank_idx, file_idx] = new_value # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
 
