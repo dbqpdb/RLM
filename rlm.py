@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 # RLM.py
 #
-# The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing 
+# The python implementation of the Random Legal Move chess-playin', sass talkin', ... thing
 #
-# 
+#
+from __future__ import annotations
+
 versionNumber = 0.40 # basic gameplay is now possible!
 
 import numpy as np
@@ -14,9 +16,21 @@ import time
 import gzip
 import pandas as pd
 
-# Let's start off with this as a single file and refactor it into multple files when we feel 
+# Let's start off with this as a single file and refactor it into multple files when we feel
 # like this one is getting unwieldy
 # --Okay. :)
+
+
+# --- Type aliases ----------------------------------------------------------
+# SquareName: anything that Board.square_name_to_array_idxs() can interpret.
+# Includes 'a3', ['a','3'], [0,2], ('a',3), etc. Always length 2 in practice
+# but Python's type system can't enforce that here.
+SquareName = str | tuple | list
+# BoardIdxs: a (file_idx, rank_idx) pair — note that numpy indexing into
+# board_array is (rank, file), opposite order. See issue #37.
+BoardIdxs = tuple[int | None, int | None]
+# PieceChar: a single character from 'KQRBNPkqrbnp' (or '-' for empty).
+PieceChar = str
 
 class Board:
     '''A class to hold and manipulate representations of the chess board'''
@@ -24,7 +38,7 @@ class Board:
     EMPTY_SQUARE = '-' # class constant, a single character string to represent an empty square
     # In the terminal, the unicode glyphs actually look reversed, so:
 
-    def __init__(self, board_position=None, piece_list=None):
+    def __init__(self, board_position: np.ndarray | str | None = None, piece_list: list | None = None):
         '''
         Constructor for Board class.  Optional board_position input allows construction
         from a given position.  board_position can be supplied as a numpy array of single 
@@ -108,7 +122,7 @@ class Board:
         6: 'g',
         7: 'h',
     }
-    def __getitem__(self, square_name):
+    def __getitem__(self, square_name: SquareName) -> str | None:
         ''' Allows indexing into Board objects.  If b is a Board, then b['a3'] should return 
         the piece which is on square a3. This function should handle indexing in pretty much any 
         sensible way we can think of.  The actual intepretation of the square name is handled
@@ -132,7 +146,7 @@ class Board:
         
     VALID_BOARD_SQUARE_CONTENTS_PATTERN = re.compile('(^[pnbrkqPNBRKQ]$)|(^%s$)' % EMPTY_SQUARE)    
 
-    def __setitem__(self, square_name, new_value):
+    def __setitem__(self, square_name: SquareName, new_value: PieceChar) -> None:
         ''' Allows setting of board positions via indexing expressions. If b is a Board, then 
         b['a3'] = 'P' should place a white pawn on square 'a3' of the board. All the ways of specifiying
         a square name allowed by square_name_to_array_idxs() are allowed. new_value must be a single 
@@ -146,7 +160,7 @@ class Board:
             self.board_array[rank_idx, file_idx] = new_value # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
 
     @classmethod
-    def square_name_to_array_idxs(cls, square_name):
+    def square_name_to_array_idxs(cls, square_name: SquareName) -> BoardIdxs:
         '''This function should handle interpreting square names in pretty much any 
         sensible way we can think of.  Here are some thoughts of how it might make sense to call
         this:
@@ -176,12 +190,12 @@ class Board:
         return file_idx, rank_idx
 
 
-    def copy(self):
+    def copy(self) -> Board:
         '''Return a copy of the existing board'''
         board_copy = Board(board_position=self.board_array )
         return board_copy
 
-    def move(self, source_square_name, destination_square_name):
+    def move(self, source_square_name: SquareName, destination_square_name: SquareName) -> str:
         '''Moves whatever piece is on the source square to the destination square.
         Throws an error if the source square is empty. Returns the contents of the 
         destination square (might be handy for capture processing). Square names 
@@ -199,7 +213,7 @@ class Board:
         return destination_occupant # return the captured piece (or empty square if it was empty)
 
 
-    def list_pieces(self):
+    def list_pieces(self) -> tuple[list[str], list[str]]:
         '''Lists all pieces which are on the board, divided into a list of white pieces
         and a list of black pieces. (Note that these are single characters, not Piece objects)'''
         pieces = [piece for piece in self.board_array.ravel() if not (piece==Board.EMPTY_SQUARE)]
@@ -208,7 +222,7 @@ class Board:
         return white_pieces, black_pieces
 
     @classmethod
-    def is_same_square(cls, square_name_1, square_name_2):
+    def is_same_square(cls, square_name_1: SquareName | None, square_name_2: SquareName | None) -> bool:
         # Returns True if square name 1 and 2 refer to the same board location, even if they are in different formats
         # If not, or if either is None, returns False
         if square_name_1 is None or square_name_2 is None:
@@ -220,18 +234,18 @@ class Board:
             return sq1==sq2
 
     @classmethod
-    def square_rank_str(cls, square_idxs):
+    def square_rank_str(cls, square_idxs: BoardIdxs) -> str:
         # Returns the rank number as a single character string (one-based, not zero-based)
         return str(int(square_idxs[1])+1)
 
     @classmethod
-    def square_file_lett(cls, square_idxs):
+    def square_file_lett(cls, square_idxs: BoardIdxs) -> str:
         # Returns the file letter as a single character string
         file_idx = square_idxs[0]
         file_lett = Board.IDX_TO_FILE_DICT[file_idx]
         return file_lett
 
-    def __str__(self):
+    def __str__(self) -> str:
         '''This is called whenever a board is converted to a string (like when it is being printed)'''
         # How about something like this:
         '''
@@ -328,7 +342,7 @@ class Board:
         return True
 
 
-    def to_FEN_board(self):
+    def to_FEN_board(self) -> str:
         '''Export current board position as FEN board string'''
         row_strings = []
         for rank_idx in range(7,-1,-1):
@@ -358,7 +372,7 @@ class Board:
         return FEN_board_string
     
 
-    def find_king_square(self, color):
+    def find_king_square(self, color: str) -> str:
         ''' Should return the square of the king of the given color (color should start 
         with 'w' or 'b', case insensitive, representing white or black). Square is returned as 
         algebraic string'''
@@ -374,7 +388,7 @@ class Board:
 
   
     @classmethod
-    def convert_FEN_to_board_array(cls, FEN):
+    def convert_FEN_to_board_array(cls, FEN: str) -> np.ndarray:
         '''Converts FEN or FEN board position to a board array and returns it'''
         # FEN's look like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         FEN_board = FEN.split()[0] # keep only first part of FEN if full FEN    
@@ -403,7 +417,7 @@ class Board:
         return board_array
 
     @classmethod
-    def squareIdx_to_boardIdxs(cls, squareIdx, board_size=(8,8)):
+    def squareIdx_to_boardIdxs(cls, squareIdx: int, board_size: tuple[int, int] = (8, 8)) -> tuple[int, int]:
         # FEN square index to board_array indices.  Must take into
         # account that ranks are in a different order and that board
         # array indices are 0-based.
@@ -426,7 +440,7 @@ class Board:
 
 
     @classmethod
-    def square_to_alg_name(cls, square_name):
+    def square_to_alg_name(cls, square_name: SquareName) -> str:
         '''Convert any square representation to algebraic square name, i.e. letter file followed by 1-based rank'''
         sq_arr = cls.square_name_to_array_idxs(square_name) # standardize
         alg_name = cls.IDX_TO_FILE_DICT[sq_arr[0]] + "%i" % (sq_arr[1] + 1) # convert
@@ -437,7 +451,17 @@ class Move:
     '''Should handle having an internal representation of moves and converting to various output
     representations 
     '''
-    def __init__(self, char, starting_square, destination_square, captured_piece=None, is_castling=False, promotion_piece=None, is_en_passant_capture=False, new_en_passant_square=None):
+    def __init__(
+        self,
+        char: PieceChar,
+        starting_square: SquareName,
+        destination_square: SquareName,
+        captured_piece: PieceChar | None = None,
+        is_castling: bool = False,
+        promotion_piece: PieceChar | None = None,
+        is_en_passant_capture: bool = False,
+        new_en_passant_square: SquareName | None = None,
+    ):
         ''' Move representation keeps track of everything needed to relate to moves. 
         '''
         self.single_char = char
@@ -450,18 +474,18 @@ class Move:
         self.new_en_passant_square = new_en_passant_square
 
 
-    def is_capture(self):
+    def is_capture(self) -> bool:
         return not (self.captured_piece is None)
 
-    def is_promotion(self):
+    def is_promotion(self) -> bool:
         return not (self.promotion_piece is None)
 
-    def to_tuple(self):
+    def to_tuple(self) -> tuple:
         # For debugging, this is a way to return the move in the internal format which is used in initialization
         move_tuple = (self.single_char, self.starting_square, self.destination_square, self.captured_piece, self.is_castling, self.promotion_piece, self.is_en_passant_capture, self.new_en_passant_square)
         return move_tuple
 
-    def to_long_algebraic(self, use_figurine=False, note_ep=False):
+    def to_long_algebraic(self, use_figurine: bool = False, note_ep: bool = False) -> str:
         '''Long algebraic includes starting and destination square'''
         if use_figurine:
             p = self.PIECE_TO_FIGURINE_DICT[self.single_char]
@@ -484,7 +508,7 @@ class Move:
         return move_string
     
 
-    def to_short_algebraic(self, board):
+    def to_short_algebraic(self, board: Board) -> str:
         # Same as long algebraic except drop destination square
         # TODO: actually, this should have a lot more logic so it includes elements of starting square if necessary
         # TODO: hmm, to do this, we actually need the board, because that's what we need to resolve ambiguities
@@ -530,16 +554,16 @@ class Move:
     }
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         '''String representation of Move class.'''
         return self.to_long_algebraic() # just use long algebraic for now
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         '''String representation for Move objects (this one shows up for example in lists)'''
         return 'MoveObject.['+str(self)+']'
 
     @classmethod
-    def square_to_string(cls, sq):
+    def square_to_string(cls, sq: BoardIdxs) -> str:
         '''Convert array indices to string'''
         # should this handle non-array index square representations also?
         file_letter = cls.IDX_TO_FILE_DICT[sq[0]]
@@ -547,7 +571,12 @@ class Move:
         return file_letter+rank_number
 
     @classmethod
-    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False):
+    def parse_move_without_game(
+        cls,
+        entered_move: str,
+        white_is_moving: bool = True,
+        make_assumptions: bool = False,
+    ) -> dict:
         ''' This function tries to extract as much information as possible from an entered move text string,
         parsing it into move elements.  It keeps track of what move elements are known, what remain unknown,
         and what have some partial information (e.g. a piece was captured, but it wasn't specified which).
@@ -766,7 +795,7 @@ class Move:
         return move_elem_dict
 
     @classmethod
-    def find_matches_to_partial_move(cls, partial_move_dict, move_list):
+    def find_matches_to_partial_move(cls, partial_move_dict: dict, move_list: list[Move]) -> list[Move]:
         ''' Find all possible matches where every known or partially known element of partial_move_dict 
         is consistent with a Move object on the given move_list. partial_move_dict should be the 
         output of parse_move_without_game().  
@@ -791,7 +820,7 @@ class Move:
         return matched_moves
 
     @classmethod
-    def parse_entered_move(cls, entered_move, white_is_moving, legal_moves_list):
+    def parse_entered_move(cls, entered_move: str, white_is_moving: bool, legal_moves_list: list[Move]) -> list[Move]:
         # Parses entered text move, and returns the set of legal moves which is 
         # consistent with entered info
         partial_move_dict = cls.parse_move_without_game(entered_move, white_is_moving)
@@ -800,14 +829,14 @@ class Move:
 
 
     @classmethod
-    def is_on_move_list(cls, move, move_list):
+    def is_on_move_list(cls, move: Move, move_list: list[Move]) -> bool:
         # Returns true if given move is on given move list
         for list_move in move_list:
             if list_move == move:
                 return True
         return False
 
-    def __eq__(self, move_to_match):
+    def __eq__(self, move_to_match: object) -> bool:
         # Returns true if self and move_to_match represent the same move in all respects
         if (self.single_char == move_to_match.single_char and
             self.starting_square == move_to_match.starting_square and
