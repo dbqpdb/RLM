@@ -166,36 +166,38 @@ def option_5_glitch(base: str | None = None, p: float = 0.10) -> str:
 # ---------------------------------------------------------------------------
 
 def layered(
-    jitter_density: float = 0.15,
-    drop_density: float = 0.03,
-    bg_noise: float = 0.03,
+    jitter_density: float = 0.30,
+    drop_density: float = 0.06,
+    bg_noise: float = 0.06,
 ) -> str:
-    """Combine per-cell jitter + glitch drops + faint background noise.
+    """Layer per-cell jitter + glitch drops + faint background noise over a
+    pre-designed banner base.
 
-    jitter_density: probability a filled cell uses a lighter glyph.
+    Each call randomly picks one banner from the pre-designed pool (Option 3)
+    and then perturbs it cell-by-cell. Original banner characters are kept
+    most of the time, so each font's character is preserved; jittered cells
+    are swapped to lighter block glyphs.
+
+    jitter_density: probability a filled cell is swapped to a lighter glyph.
     drop_density:   probability a filled cell is dropped to space.
-    bg_noise:       probability a background cell shows a faint mark.
+    bg_noise:       probability a background space shows a faint mark.
     """
-    grid = _mask_grid()
-    rows = []
-    for row in grid:
-        out = []
-        for cell in row:
+    base = random.choice(_BANNERS).strip("\n")
+    out: list[str] = []
+    for c in base:
+        if c == "\n":
+            out.append(c)
+        elif c == " ":
+            out.append(random.choice(["·", ".", "•"]) if random.random() < bg_noise else " ")
+        else:
             r = random.random()
-            if cell:
-                if r < drop_density:
-                    out.append(" ")
-                elif r < drop_density + jitter_density:
-                    out.append(random.choice(["▓", "▒"]))
-                else:
-                    out.append("█")
+            if r < drop_density:
+                out.append(" ")
+            elif r < drop_density + jitter_density:
+                out.append(random.choice(["▓", "▒", "░"]))
             else:
-                if r < bg_noise:
-                    out.append(random.choice(["·", ".", "•"]))
-                else:
-                    out.append(" ")
-        rows.append("".join(out))
-    return "\n".join(rows)
+                out.append(c)
+    return "".join(out)
 
 
 # ---------------------------------------------------------------------------
@@ -220,15 +222,15 @@ def print_all_options() -> None:
 
 
 def print_layered_tunings() -> None:
-    print(_hr("Layered, three tunings"))
-    print("-- subtle  (jitter=0.05, drop=0.00, bg=0.01) --")
-    print(layered(jitter_density=0.05, drop_density=0.0, bg_noise=0.01))
+    print(_hr("Layered (base = pre-designed banner), three tunings"))
+    print("-- subtle  (jitter=0.10, drop=0.00, bg=0.02) --")
+    print(layered(jitter_density=0.10, drop_density=0.0, bg_noise=0.02))
     print()
-    print("-- medium  (jitter=0.15, drop=0.03, bg=0.03) --")
-    print(layered(jitter_density=0.15, drop_density=0.03, bg_noise=0.03))
+    print("-- medium  (jitter=0.30, drop=0.06, bg=0.06) --")
+    print(layered(jitter_density=0.30, drop_density=0.06, bg_noise=0.06))
     print()
-    print("-- heavy   (jitter=0.30, drop=0.10, bg=0.08) --")
-    print(layered(jitter_density=0.30, drop_density=0.10, bg_noise=0.08))
+    print("-- heavy   (jitter=0.60, drop=0.20, bg=0.16) --")
+    print(layered(jitter_density=0.60, drop_density=0.20, bg_noise=0.16))
 
 
 def main() -> None:
