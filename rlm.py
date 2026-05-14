@@ -549,7 +549,7 @@ class Move:
         return file_letter+rank_number
 
     @classmethod
-    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False):
+    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False, verbose=False):
         ''' This function tries to extract as much information as possible from an entered move text string,
         parsing it into move elements.  It keeps track of what move elements are known, what remain unknown,
         and what have some partial information (e.g. a piece was captured, but it wasn't specified which).
@@ -756,10 +756,11 @@ class Move:
                     move_elem_dict['new_en_passant_square'] = None
 
         # Conditional tree traversed, let's take a look at the results
-        print("Move Elements")
-        for key, value in move_elem_dict.items():
-            print("%s: %s"%(key, str(value)))
-        print(msg)
+        if verbose:
+            print("Move Elements")
+            for key, value in move_elem_dict.items():
+                print("%s: %s"%(key, str(value)))
+            print(msg)
 
         # Could have a dict where move element names are keys, and all initially have value of 'unknown'
         # Then could fill in with actual value or with 'notNone', or leave as 'unknown'
