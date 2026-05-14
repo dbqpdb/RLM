@@ -28,6 +28,7 @@ dependencies:
   - pip
   - pycodestyle
   - pyflakes
+  - pytest
   - python
   - python-dateutil
   - pytz
