@@ -815,7 +815,7 @@ class Move:
             self.captured_piece == move_to_match.captured_piece and
             self.promotion_piece == move_to_match.promotion_piece and
             self.is_en_passant_capture == move_to_match.is_en_passant_capture and
-            self.new_en_passant_square == self.new_en_passant_square):
+            self.new_en_passant_square == move_to_match.new_en_passant_square):
             return True
         else:
             return False
