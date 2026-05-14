@@ -141,7 +141,7 @@ class Board:
         assert re.match(Board.VALID_BOARD_SQUARE_CONTENTS_PATTERN, new_value), 'new_value "%s" is not a valid character to place in a Board array' % (new_value)
         file_idx, rank_idx = self.square_name_to_array_idxs(square_name)
         if rank_idx is None or file_idx is None:
-            Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
+            raise Exception('Square name "%s" did not parse to valid rank and file indices, setting board position failed!'%(square_name))
         else:
             self.board_array[rank_idx, file_idx] = new_value # NB that indexing into numpy array is rank,file whereas everywhere else we use file,rank
 
@@ -159,8 +159,10 @@ class Board:
         Returns file, rank.  If either can't be interpreted or are off board, that index is returned as None
         '''
         assert len(square_name)==2, 'Board square names must have len 2 to be interpretable!'
-        # Convert first element of square name to a file index (or None if it doesn't convert)
-        file_idx = Board.FILE_TO_IDX_DICT.setdefault(square_name[0], None)
+        # Convert first element of square name to a file index (or None if it doesn't convert).
+        # Use .get() rather than .setdefault() — setdefault would mutate the class-level dict on any
+        # unknown key, accumulating garbage entries across the lifetime of the process.
+        file_idx = Board.FILE_TO_IDX_DICT.get(square_name[0])
         # Try to convert second element of square name to a rank index
         try:
             if isinstance(square_name[1], str):
@@ -547,7 +549,7 @@ class Move:
         return file_letter+rank_number
 
     @classmethod
-    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False):
+    def parse_move_without_game(cls, entered_move, white_is_moving=True, make_assumptions=False, verbose=False):
         ''' This function tries to extract as much information as possible from an entered move text string,
         parsing it into move elements.  It keeps track of what move elements are known, what remain unknown,
         and what have some partial information (e.g. a piece was captured, but it wasn't specified which).
@@ -754,10 +756,11 @@ class Move:
                     move_elem_dict['new_en_passant_square'] = None
 
         # Conditional tree traversed, let's take a look at the results
-        print("Move Elements")
-        for key, value in move_elem_dict.items():
-            print("%s: %s"%(key, str(value)))
-        print(msg)
+        if verbose:
+            print("Move Elements")
+            for key, value in move_elem_dict.items():
+                print("%s: %s"%(key, str(value)))
+            print(msg)
 
         # Could have a dict where move element names are keys, and all initially have value of 'unknown'
         # Then could fill in with actual value or with 'notNone', or leave as 'unknown'
@@ -815,7 +818,7 @@ class Move:
             self.captured_piece == move_to_match.captured_piece and
             self.promotion_piece == move_to_match.promotion_piece and
             self.is_en_passant_capture == move_to_match.is_en_passant_capture and
-            self.new_en_passant_square == self.new_en_passant_square):
+            self.new_en_passant_square == move_to_match.new_en_passant_square):
             return True
         else:
             return False
@@ -1790,7 +1793,7 @@ class TestRLM:
         entered_move = 'b8=Q'
         matching_moves = Move.parse_entered_move(entered_move, white_is_moving=g.side_to_move=='w', legal_moves_list=legal_moves_list)
         expected_matching_moves = [Move('P', 'b7','b8', promotion_piece='Q')]
-        assert(len(matching_moves)==len(expected_matching_moves), "There should be exactly %i matching move(s), but %i were found!"%(len(expected_matching_moves), len(matching_moves)) )
+        assert len(matching_moves) == len(expected_matching_moves), "There should be exactly %i matching move(s), but %i were found!" % (len(expected_matching_moves), len(matching_moves))
         entered_move = 'bxa8=N'
         entered_move = 'bxa8' # ambiguous because it doesn't specify promotion piece
         entered_move = 'bxR'# THIS IS TRICKY!!  In this position, it means b pawn takes R on a8, but it is ambiguous with bishop x Rook
