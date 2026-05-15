@@ -1705,8 +1705,9 @@ class Loudmouth:
         "This {noun} is a {adverb} {adjective} {noun}."
         and inserts random words from the relevant classes.
         '''
-        fill = [x.strip("{}") for x in re.findall('\{.+?\}', template)]
-        template = re.sub("\{.*?\}", "{}", template)
+        slot_pattern = re.compile(r'\{.+?\}')
+        fill = [x.strip("{}") for x in slot_pattern.findall(template)]
+        template = slot_pattern.sub("{}", template)
         self.noggin.squawk_pos()
         print(template.format(*[self.noggin.spew(x) for x in fill]))
 
