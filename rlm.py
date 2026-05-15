@@ -1662,29 +1662,6 @@ class Pawn (Piece):
 
 
 
-def sillyDude():
-    dude = random.choice(['Mike', 'Bryan'])
-    print("Is " + dude + " silly?:")
-    def backline():        
-        print(' ' * messagelen, end='')
-        print('\r', end='')
-
-    for __ in range(50):
-        compute = random.random()
-        message = "Computing... " + str(compute)
-        messagelen = len(message)
-        time.sleep(compute/10)
-        print(message, end='')
-        backline()
-    backline()
-    # Put it this way: if silly were a something, and Mike was a something els, he'd be somethinging the first something to some outrageous extent.
-    #mikeThing = 
-    #sillyThing = 
-    #verb = 
-    #extent = 
-    print("Yes. Quite." if compute else "No. Not at all. Why do you ask?")
-
-
 # Prep the dictionary
 class Lexicon:
     def __init__(self, lexfile='subtlex.txt.gz'):
@@ -2005,10 +1982,5 @@ def run_me_if_i_am_the_main_file():
 
 
 
-def run_him_if_i_am_not_the_main_file():
-    print("Interesting; you thought it'd be a good idea to import a random-move-playing chess engine from some other application. How droll!")
-
 if __name__ == '__main__':
     run_me_if_i_am_the_main_file()
-else:
-    run_him_if_i_am_not_the_main_file()
